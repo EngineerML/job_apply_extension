@@ -1,98 +1,185 @@
+const API_BASE = "http://localhost:8000";
+
+// ── DOM refs ──────────────────────────────────────────────
+const views = {
+  setup:       document.getElementById("view-setup"),
+  main:        document.getElementById("view-main"),
+  coverLetter: document.getElementById("view-cover-letter"),
+};
+
+const headerUser  = document.getElementById("header-user");
+const inputName   = document.getElementById("input-name");
+const inputResume = document.getElementById("resume-input");
+const btnSaveUser = document.getElementById("btn-save-user");
+const statusSetup = document.getElementById("status-setup");
+
+const elTitle     = document.getElementById("job-title");
+const elCompany   = document.getElementById("job-company");
+const elTextarea  = document.getElementById("cover-letter");
+const btnGenerate = document.getElementById("btn-generate");
+const btnSaveCL   = document.getElementById("btn-save-cl");
+const btnDownload = document.getElementById("btn-download");
+const statusCL    = document.getElementById("status-cl");
+const btnBack     = document.getElementById("btn-back");
+
 let jobData = null;
 
-const elTitle    = document.getElementById("job-title");
-const elCompany  = document.getElementById("job-company");
-const elTextarea = document.getElementById("cover-letter");
-const btnGen     = document.getElementById("btn-generate");
-const btnSave    = document.getElementById("btn-save");
-const btnDl      = document.getElementById("btn-download");
-const elStatus   = document.getElementById("status");
-
-function setStatus(msg, isError = false) {
-  elStatus.textContent = msg;
-  elStatus.className = isError ? "error" : "";
+// ── Helpers ───────────────────────────────────────────────
+function showView(name) {
+  Object.values(views).forEach((v) => v.classList.remove("active"));
+  views[name].classList.add("active");
 }
 
-// On popup open, scrape the active tab
-chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-  chrome.tabs.sendMessage(tab.id, { type: "SCRAPE_JOB" }, (data) => {
-    if (chrome.runtime.lastError || !data) {
-      setStatus("Could not scrape page.", true);
-      return;
+function setStatus(el, msg, type = "") {
+  el.textContent = msg;
+  el.className = `status ${type}`;
+}
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Request failed");
+  return data;
+}
+
+// ── Init: check if user exists ────────────────────────────
+apiFetch("/user")
+  .then((data) => {
+    if (data.exists) {
+      headerUser.textContent = `👤 ${data.name}`;
+      showView("main");
+    } else {
+      showView("setup");
     }
-    jobData = data;
-    elTitle.textContent   = data.title   || "Not found";
-    elCompany.textContent = data.company || "Not found";
+  })
+  .catch(() => showView("setup"));
+
+// ── Setup: save user ──────────────────────────────────────
+btnSaveUser.addEventListener("click", async () => {
+  const name   = inputName.value.trim();
+  const resume = inputResume.value.trim();
+
+  if (!name)   return setStatus(statusSetup, "Please enter your name.", "error");
+  if (!resume) return setStatus(statusSetup, "Please paste your resume.", "error");
+
+  btnSaveUser.disabled = true;
+  setStatus(statusSetup, "Saving…");
+
+  try {
+    const data = await apiFetch("/save-user", {
+      method: "POST",
+      body: JSON.stringify({ name, base_resume_text: resume }),
+    });
+    headerUser.textContent = `👤 ${data.name}`;
+    showView("main");
+  } catch (err) {
+    setStatus(statusSetup, err.message, "error");
+  } finally {
+    btnSaveUser.disabled = false;
+  }
+});
+
+// ── Edit profile ─────────────────────────────────────────
+document.getElementById("btn-edit-profile").addEventListener("click", async () => {
+  try {
+    const data = await apiFetch("/user/full");
+    inputName.value   = data.name || "";
+    inputResume.value = data.base_resume_text || "";
+  } catch {
+    inputName.value   = "";
+    inputResume.value = "";
+  }
+  setStatus(statusSetup, "");
+  showView("setup");
+});
+
+// ── Nav: cover letter card ────────────────────────────────
+document.getElementById("nav-cover-letter").addEventListener("click", () => {
+  showView("coverLetter");
+
+  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+    chrome.tabs.sendMessage(tab.id, { type: "SCRAPE_JOB" }, (data) => {
+      if (chrome.runtime.lastError || !data) {
+        setStatus(statusCL, "Could not scrape page.", "error");
+        return;
+      }
+      jobData = data;
+      elTitle.textContent   = data.title   || "Not found";
+      elCompany.textContent = data.company || "Not found";
+    });
   });
 });
 
-// Generate
-btnGen.addEventListener("click", () => {
-  if (!jobData) return setStatus("No job data found.", true);
+// ── Back ──────────────────────────────────────────────────
+btnBack.addEventListener("click", () => showView("main"));
 
-  btnGen.disabled = true;
-  setStatus("Generating…");
+// ── Generate cover letter ─────────────────────────────────
+btnGenerate.addEventListener("click", async () => {
+  if (!jobData) return setStatus(statusCL, "No job data found.", "error");
 
-  chrome.runtime.sendMessage(
-    {
-      type: "GENERATE",
-      payload: {
+  btnGenerate.disabled = true;
+  setStatus(statusCL, "Generating…");
+
+  try {
+    const data = await apiFetch("/generate-cover-letter", {
+      method: "POST",
+      body: JSON.stringify({
         job_title:       jobData.title,
         company:         jobData.company,
         job_description: jobData.description,
-      },
-    },
-    (res) => {
-      btnGen.disabled = false;
-      if (!res.ok) return setStatus(res.error, true);
-
-      elTextarea.value = res.data.cover_letter;
-      btnSave.disabled = false;
-      btnDl.disabled   = false;
-      setStatus("Done! Edit as needed.");
-    }
-  );
+      }),
+    });
+    elTextarea.value     = data.cover_letter;
+    btnSaveCL.disabled   = false;
+    btnDownload.disabled = false;
+    setStatus(statusCL, "Done! Edit as needed.", "success");
+  } catch (err) {
+    setStatus(statusCL, err.message, "error");
+  } finally {
+    btnGenerate.disabled = false;
+  }
 });
 
-// Save
-btnSave.addEventListener("click", () => {
+// ── Save cover letter ─────────────────────────────────────
+btnSaveCL.addEventListener("click", async () => {
   const content = elTextarea.value.trim();
-  if (!content) return setStatus("Nothing to save.", true);
+  if (!content) return setStatus(statusCL, "Nothing to save.", "error");
 
-  btnSave.disabled = true;
-  setStatus("Saving…");
+  btnSaveCL.disabled = true;
+  setStatus(statusCL, "Saving…");
 
-  chrome.runtime.sendMessage(
-    {
-      type: "SAVE",
-      payload: {
+  try {
+    await apiFetch("/save-cover-letter", {
+      method: "POST",
+      body: JSON.stringify({
         job_title:       jobData.title,
         company:         jobData.company,
         job_description: jobData.description,
         job_url:         jobData.url,
         cover_letter:    content,
-      },
-    },
-    (res) => {
-      btnSave.disabled = false;
-      if (!res.ok) return setStatus(res.error, true);
-      setStatus("Saved ✓");
-    }
-  );
+      }),
+    });
+    setStatus(statusCL, "Saved ✓", "success");
+  } catch (err) {
+    setStatus(statusCL, err.message, "error");
+  } finally {
+    btnSaveCL.disabled = false;
+  }
 });
 
-// Download
-btnDl.addEventListener("click", () => {
+// ── Download .txt ─────────────────────────────────────────
+btnDownload.addEventListener("click", () => {
   const content = elTextarea.value.trim();
   if (!content) return;
 
   const blob = new Blob([content], { type: "text/plain" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
-  const name = `cover-letter-${(jobData?.company || "job").replace(/\s+/g, "-").toLowerCase()}.txt`;
-
   a.href     = url;
-  a.download = name;
+  a.download = `cover-letter-${(jobData?.company || "job").replace(/\s+/g, "-").toLowerCase()}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 });
