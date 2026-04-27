@@ -16,13 +16,15 @@ const statusSetup = document.getElementById("status-setup");
 const elTitle     = document.getElementById("job-title");
 const elCompany   = document.getElementById("job-company");
 const elTextarea  = document.getElementById("cover-letter");
-const btnGenerate = document.getElementById("btn-generate");
-const btnSaveCL   = document.getElementById("btn-save-cl");
-const btnDownload = document.getElementById("btn-download");
-const statusCL    = document.getElementById("status-cl");
-const btnBack     = document.getElementById("btn-back");
+const btnGenerate   = document.getElementById("btn-generate");
+const btnSaveCL     = document.getElementById("btn-save-cl");
+const btnDownload   = document.getElementById("btn-download");
+const btnDownloadPdf = document.getElementById("btn-download-pdf");
+const statusCL      = document.getElementById("status-cl");
+const btnBack       = document.getElementById("btn-back");
 
 let jobData = null;
+let currentUsername = "";
 
 // ── Helpers ───────────────────────────────────────────────
 function showView(name) {
@@ -50,6 +52,7 @@ apiFetch("/user")
   .then((data) => {
     if (data.exists) {
       headerUser.textContent = `👤 ${data.name}`;
+      currentUsername = data.name;
       showView("main");
     } else {
       showView("setup");
@@ -74,6 +77,7 @@ btnSaveUser.addEventListener("click", async () => {
       body: JSON.stringify({ name, base_resume_text: resume }),
     });
     headerUser.textContent = `👤 ${data.name}`;
+    currentUsername = data.name;
     showView("main");
   } catch (err) {
     setStatus(statusSetup, err.message, "error");
@@ -132,9 +136,10 @@ btnGenerate.addEventListener("click", async () => {
         job_description: jobData.description,
       }),
     });
-    elTextarea.value     = data.cover_letter;
-    btnSaveCL.disabled   = false;
-    btnDownload.disabled = false;
+    elTextarea.value        = data.cover_letter;
+    btnSaveCL.disabled      = false;
+    btnDownload.disabled    = false;
+    btnDownloadPdf.disabled = false;
     setStatus(statusCL, "Done! Edit as needed.", "success");
   } catch (err) {
     setStatus(statusCL, err.message, "error");
@@ -182,4 +187,40 @@ btnDownload.addEventListener("click", () => {
   a.download = `cover-letter-${(jobData?.company || "job").replace(/\s+/g, "-").toLowerCase()}.txt`;
   a.click();
   URL.revokeObjectURL(url);
+});
+
+// ── Download PDF ──────────────────────────────────────────
+btnDownloadPdf.addEventListener("click", async () => {
+  const content = elTextarea.value.trim();
+  if (!content) return;
+
+  btnDownloadPdf.disabled = true;
+  setStatus(statusCL, "Generating PDF…");
+
+  try {
+    const res = await fetch(`${API_BASE}/download-pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content,
+        username:  currentUsername,
+        job_title: jobData?.title || "job",
+      }),
+    });
+    if (!res.ok) throw new Error("PDF generation failed");
+
+    const blob     = await res.blob();
+    const url      = URL.createObjectURL(blob);
+    const a        = document.createElement("a");
+    const filename = `${currentUsername}_${jobData?.title || "job"}_coverletter.pdf`.replace(/\s+/g, "_");
+    a.href     = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(statusCL, "PDF downloaded ✓", "success");
+  } catch (err) {
+    setStatus(statusCL, err.message, "error");
+  } finally {
+    btnDownloadPdf.disabled = false;
+  }
 });
