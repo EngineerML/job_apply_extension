@@ -61,6 +61,7 @@ async function loadJobs() {
         <td class="company-cell" title="${job.company || ""}">${job.company || "—"}</td>
         <td><span class="${statusClass(job.status)}">${job.status || "Applied"}</span></td>
         <td><button class="btn-view" data-id="${job.id}">View</button></td>
+        <td><button class="btn-delete" data-id="${job.id}">Delete</button></td>
       `;
       tbody.appendChild(tr);
     });
@@ -69,13 +70,33 @@ async function loadJobs() {
     window._jobs = jobs;
     tableWrap.style.display = "block";
 
-    // Attach view button listeners
+    // Attach view and delete button listeners
     tbody.querySelectorAll(".btn-view").forEach((btn) => {
       btn.addEventListener("click", () => openModal(btn.dataset.id));
     });
 
+    tbody.querySelectorAll(".btn-delete").forEach((btn) => {
+      btn.addEventListener("click", () => deleteJob(btn.dataset.id));
+    });
+
   } catch (err) {
     loadingEl.textContent = `Error: ${err.message}`;
+  }
+}
+
+// Delete job
+async function deleteJob(jobId) {
+  if (!confirm("Delete this job and its cover letter?")) return;
+  try {
+    await apiFetch(`/jobs/${jobId}`, { method: "DELETE" });
+    window._jobs = window._jobs.filter((j) => j.id !== jobId);
+    tbody.querySelector(`[data-id="${jobId}"]`)?.closest("tr")?.remove();
+    if (!window._jobs.length) {
+      tableWrap.style.display = "none";
+      emptyEl.style.display   = "block";
+    }
+  } catch (err) {
+    alert(`Delete failed: ${err.message}`);
   }
 }
 

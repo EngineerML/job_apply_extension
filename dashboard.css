@@ -133,6 +133,16 @@ button {
 }
 .btn-view:hover { background: rgba(99,102,241,0.1); }
 
+.btn-delete {
+  background: transparent;
+  color: #6b6b80;
+  border: 1px solid #2a2a38;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+.btn-delete:hover { background: rgba(248,113,113,0.1); color: #f87171; border-color: #f87171; }
+
 /* Modal */
 .modal-overlay {
   position: fixed;
