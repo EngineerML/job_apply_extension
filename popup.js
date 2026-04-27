@@ -41,7 +41,26 @@ const btnCloseModal = document.getElementById("btn-close-modal");
 
 let jobData         = null;
 let currentUsername = "";
-let setupReturnView = "welcome"; // where setup back btn returns to
+let setupReturnView = "welcome";
+
+async function checkExistingJob() {
+  if (!jobData?.url) return;
+  try {
+    const data = await apiFetch("/check-job", {
+      method: "POST",
+      body: JSON.stringify({ job_url: jobData.url }),
+    });
+    if (data.found && data.cover_letter) {
+      elTextarea.value        = data.cover_letter;
+      btnSaveCL.disabled      = true;
+      btnDownload.disabled    = false;
+      btnDownloadPdf.disabled = false;
+      setStatus(statusCL, "Previously saved cover letter loaded.", "success");
+    }
+  } catch {
+    // silently ignore — user can still generate manually
+  }
+}
 
 // Helpers
 function showView(name) {
@@ -90,6 +109,7 @@ function scrapeCurrentTab() {
           elCompany.textContent = data.company || "Not found";
           rowShowDesc.style.display = data.description ? "flex" : "none";
           setStatus(statusCL, "Job data detected.", "success");
+          checkExistingJob();
         });
       }
     );
@@ -115,6 +135,7 @@ chrome.runtime.onMessage.addListener((message) => {
   btnSaveCL.disabled   = true;
   btnDownload.disabled = true;
   btnDownloadPdf.disabled = true;
+  checkExistingJob();
 });
 
 // Init: check if user exists
@@ -271,6 +292,7 @@ btnSaveCL.addEventListener("click", async () => {
       }),
     });
     setStatus(statusCL, "Saved!", "success");
+    btnSaveCL.disabled = true;
   } catch (err) {
     setStatus(statusCL, err.message, "error");
   } finally {
@@ -293,37 +315,32 @@ btnDownload.addEventListener("click", () => {
 });
 
 // Download PDF
-btnDownloadPdf.addEventListener("click", async () => {
+btnDownloadPdf.addEventListener("click", () => {
   const content = elTextarea.value.trim();
   if (!content) return;
 
-  btnDownloadPdf.disabled = true;
-  setStatus(statusCL, "Generating PDF...");
+  const { jsPDF } = window.jspdf;
+  const doc      = new jsPDF({ unit: "mm", format: "a4" });
+  const margin   = 20;
+  const maxWidth = 210 - margin * 2;
 
-  try {
-    const res = await fetch(`${API_BASE}/download-pdf`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        content,
-        username:  currentUsername,
-        job_title: jobData?.title || "job",
-      }),
-    });
-    if (!res.ok) throw new Error("PDF generation failed");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(currentUsername, margin, margin);
 
-    const blob     = await res.blob();
-    const url      = URL.createObjectURL(blob);
-    const a        = document.createElement("a");
-    const filename = `${currentUsername}_${jobData?.title || "job"}_coverletter.pdf`.replace(/\s+/g, "_");
-    a.href     = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    setStatus(statusCL, "PDF downloaded!", "success");
-  } catch (err) {
-    setStatus(statusCL, err.message, "error");
-  } finally {
-    btnDownloadPdf.disabled = false;
-  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.text(`Cover Letter — ${jobData?.title || "Job"}`, margin, margin + 7);
+
+  let y = margin + 16;
+  content.split("\n\n").forEach((para) => {
+    const lines = doc.splitTextToSize(para.replace(/\n/g, " ").trim(), maxWidth);
+    if (y + lines.length * 6 > 280) { doc.addPage(); y = margin; }
+    doc.text(lines, margin, y);
+    y += lines.length * 6 + 4;
+  });
+
+  const filename = `${currentUsername}_${jobData?.title || "job"}_coverletter.pdf`.replace(/\s+/g, "_");
+  doc.save(filename);
+  setStatus(statusCL, "PDF downloaded!", "success");
 });
