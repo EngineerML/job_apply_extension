@@ -349,7 +349,74 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   margin: 4px 0;
 }
 
-/* ── Job info card ───────────────────────────────────── */
+/* ── Scan view ───────────────────────────────────────── */
+.scan-hero {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid #2a2a38;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scan-hero .hero-icon { font-size: 28px; margin-bottom: 4px; }
+
+.job-info-card {
+  background: #1e1e2a;
+  border: 1px solid #2a2a38;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ── Pinned view ─────────────────────────────────────── */
+.pinned-header {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid #6366f1;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pin-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #818cf8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.cl-preview {
+  background: #1e1e2a;
+  border: 1px solid #2a2a38;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.cl-preview-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b6b80;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.cl-preview-text {
+  font-size: 12px;
+  color: #a0a0b8;
+  line-height: 1.6;
+}
+
+/* ── Job info card (cover letter view) ───────────────── */
 #job-info {
   background: #1e1e2a;
   border: 1px solid #2a2a38;
@@ -360,6 +427,7 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   gap: 4px;
   flex-shrink: 0;
 }
+
 
 .job-info-row {
   display: flex;

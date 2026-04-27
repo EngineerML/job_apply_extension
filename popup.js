@@ -1,68 +1,68 @@
 const API_BASE = "http://localhost:8000";
 
-// DOM refs
+// ── DOM refs ──────────────────────────────────────────
 const views = {
   welcome:     document.getElementById("view-welcome"),
   setup:       document.getElementById("view-setup"),
-  main:        document.getElementById("view-main"),
+  scan:        document.getElementById("view-scan"),
+  pinned:      document.getElementById("view-pinned"),
   coverLetter: document.getElementById("view-cover-letter"),
 };
 
 const headerUser     = document.getElementById("header-user");
 const headerUserName = document.getElementById("header-user-name");
 
+// Welcome
 const welcomeUserName = document.getElementById("welcome-user-name");
 const btnContinueAs   = document.getElementById("btn-continue-as");
 const btnUseDifferent = document.getElementById("btn-use-different");
 
-const inputName   = document.getElementById("input-name");
-const inputResume = document.getElementById("resume-input");
-const btnSaveUser = document.getElementById("btn-save-user");
-const btnSetupBack = document.getElementById("btn-setup-back");
-const setupTitle   = document.getElementById("setup-title");
+// Setup
+const inputName     = document.getElementById("input-name");
+const inputResume   = document.getElementById("resume-input");
+const btnSaveUser   = document.getElementById("btn-save-user");
+const btnSetupBack  = document.getElementById("btn-setup-back");
+const setupTitle    = document.getElementById("setup-title");
 const setupSubtitle = document.getElementById("setup-subtitle");
-const statusSetup  = document.getElementById("status-setup");
+const statusSetup   = document.getElementById("status-setup");
 
-const elTitle        = document.getElementById("job-title");
-const elCompany      = document.getElementById("job-company");
+// Scan
+const scanTitle      = document.getElementById("scan-title");
+const scanCompany    = document.getElementById("scan-company");
+const scanRowDesc    = document.getElementById("scan-row-desc");
+const btnPin         = document.getElementById("btn-pin");
+const statusScan     = document.getElementById("status-scan");
+
+// Pinned
+const pinnedTitle    = document.getElementById("pinned-title");
+const pinnedCompany  = document.getElementById("pinned-company");
+const pinnedRowDesc  = document.getElementById("pinned-row-desc");
+const pinnedClPreview = document.getElementById("pinned-cl-preview");
+const pinnedClText   = document.getElementById("pinned-cl-text");
+const btnGoCoverLetter = document.getElementById("btn-go-cover-letter");
+const btnComplete    = document.getElementById("btn-complete");
+const statusPinned   = document.getElementById("status-pinned");
+
+// Cover letter
+const clTitle        = document.getElementById("cl-title");
+const clCompany      = document.getElementById("cl-company");
 const elTextarea     = document.getElementById("cover-letter");
 const btnGenerate    = document.getElementById("btn-generate");
-const btnSaveCL      = document.getElementById("btn-save-cl");
 const btnDownload    = document.getElementById("btn-download");
 const btnDownloadPdf = document.getElementById("btn-download-pdf");
 const statusCL       = document.getElementById("status-cl");
-const btnBack        = document.getElementById("btn-back");
 
-const rowShowDesc   = document.getElementById("row-show-desc");
-const btnShowDesc   = document.getElementById("btn-show-desc");
+// Modal
 const modalDesc     = document.getElementById("modal-desc");
 const modalDescText = document.getElementById("modal-desc-text");
-const btnCloseModal = document.getElementById("btn-close-modal");
 
-let jobData         = null;
+// ── State ─────────────────────────────────────────────
+let scannedJob    = null;   // job detected on current page (scan view)
+let pinnedJob     = null;   // locked-in job (pinned view)
+let coverLetter   = "";     // current cover letter text
 let currentUsername = "";
-let setupReturnView = "welcome";
 
-async function checkExistingJob() {
-  if (!jobData?.url) return;
-  try {
-    const data = await apiFetch("/check-job", {
-      method: "POST",
-      body: JSON.stringify({ job_url: jobData.url }),
-    });
-    if (data.found && data.cover_letter) {
-      elTextarea.value        = data.cover_letter;
-      btnSaveCL.disabled      = true;
-      btnDownload.disabled    = false;
-      btnDownloadPdf.disabled = false;
-      setStatus(statusCL, "Previously saved cover letter loaded.", "success");
-    }
-  } catch {
-    // silently ignore — user can still generate manually
-  }
-}
-
-// Helpers
+// ── Helpers ───────────────────────────────────────────
 function showView(name) {
   Object.values(views).forEach((v) => v.classList.remove("active"));
   views[name].classList.add("active");
@@ -88,180 +88,138 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
-// Fix for side panel: inject scraper directly via scripting API
-// instead of messaging content script (which may not be injected yet)
+function showDescModal(text) {
+  modalDescText.textContent = text || "No description available.";
+  modalDesc.style.display   = "flex";
+}
+
+// ── Persist pin across panel close/reopen ─────────────
+function savePin(job) {
+  chrome.storage.session.set({ pinnedJob: job });
+}
+
+function clearPin() {
+  chrome.storage.session.remove("pinnedJob");
+}
+
+// ── Scrape current tab ────────────────────────────────
 function scrapeCurrentTab() {
+  setStatus(statusScan, "Detecting job...");
   chrome.tabs.query({ active: true, lastFocusedWindow: true }, ([tab]) => {
-    if (!tab) {
-      setStatus(statusCL, "Could not find active tab.", "error");
-      return;
-    }
+    if (!tab) { setStatus(statusScan, "Could not find active tab.", "error"); return; }
     chrome.scripting.executeScript(
       { target: { tabId: tab.id }, files: ["content.js"] },
       () => {
         chrome.tabs.sendMessage(tab.id, { type: "SCRAPE_JOB" }, (data) => {
           if (chrome.runtime.lastError || !data) {
-            setStatus(statusCL, "Could not scrape page. Try refreshing the tab.", "error");
+            setStatus(statusScan, "Could not detect job. Try refreshing.", "error");
             return;
           }
-          jobData = data;
-          elTitle.textContent   = data.title   || "Not found";
-          elCompany.textContent = data.company || "Not found";
-          rowShowDesc.style.display = data.description ? "flex" : "none";
-          setStatus(statusCL, "Job data detected.", "success");
-          checkExistingJob();
+          scannedJob = data;
+          scanTitle.textContent   = data.title   || "Not found";
+          scanCompany.textContent = data.company || "Not found";
+          scanRowDesc.style.display = data.description ? "flex" : "none";
+          if (data.title || data.company) {
+            btnPin.disabled = false;
+            setStatus(statusScan, "Job detected — pin it to start.", "success");
+          } else {
+            setStatus(statusScan, "No job detected on this page.", "");
+          }
         });
       }
     );
   });
 }
 
-// Listen for dynamic job updates pushed from content.js
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.type !== "JOB_UPDATED") return;
-  const data = message.data;
-  // Only update if cover letter view is active and data is different
-  if (!views.coverLetter.classList.contains("active")) return;
-  if (jobData && jobData.url === data.url && jobData.title === data.title) return;
-
-  jobData = data;
-  elTitle.textContent   = data.title   || "Not found";
-  elCompany.textContent = data.company || "Not found";
-  rowShowDesc.style.display = data.description ? "flex" : "none";
-  setStatus(statusCL, "Job updated — ready to generate.", "success");
-
-  // Reset cover letter area for the new job
-  elTextarea.value     = "";
-  btnSaveCL.disabled   = true;
-  btnDownload.disabled = true;
-  btnDownloadPdf.disabled = true;
-  checkExistingJob();
+// ── Pin ───────────────────────────────────────────────
+btnPin.addEventListener("click", () => {
+  if (!scannedJob) return;
+  pinnedJob = scannedJob;
+  savePin(pinnedJob);
+  coverLetter = "";
+  loadPinnedView();
+  showView("pinned");
 });
 
-// Init: check if user exists
-apiFetch("/user")
-  .then((data) => {
-    if (data.exists) {
-      currentUsername = data.name;
-      setHeaderUser(data.name);
-      welcomeUserName.textContent = data.name;
-      showView("welcome");
-    } else {
-      setupReturnView = "welcome";
-      showView("setup");
-    }
-  })
-  .catch(() => {
-    setupReturnView = "welcome";
-    showView("setup");
-  });
+function loadPinnedView() {
+  pinnedTitle.textContent   = pinnedJob.title   || "—";
+  pinnedCompany.textContent = pinnedJob.company || "—";
+  pinnedRowDesc.style.display = pinnedJob.description ? "block" : "none";
+  refreshClPreview();
+  setStatus(statusPinned, "");
+}
 
-// Welcome: continue
-btnContinueAs.addEventListener("click", () => showView("main"));
+function refreshClPreview() {
+  if (coverLetter) {
+    pinnedClText.textContent    = coverLetter.slice(0, 120) + (coverLetter.length > 120 ? "…" : "");
+    pinnedClPreview.style.display = "block";
+  } else {
+    pinnedClPreview.style.display = "none";
+  }
+}
 
-// Welcome: use different account
-btnUseDifferent.addEventListener("click", () => {
-  setupReturnView           = "welcome";
-  setupTitle.textContent    = "Set up your profile";
-  setupSubtitle.textContent = "Enter your name and resume to get started.";
-  inputName.value   = "";
-  inputResume.value = "";
-  setStatus(statusSetup, "");
-  showView("setup");
-});
-
-// Setup: back button — returns to wherever we came from
-btnSetupBack.addEventListener("click", () => showView(setupReturnView));
-
-// Setup: save user
-btnSaveUser.addEventListener("click", async () => {
-  const name   = inputName.value.trim();
-  const resume = inputResume.value.trim();
-
-  if (!name)   return setStatus(statusSetup, "Please enter your name.", "error");
-  if (!resume) return setStatus(statusSetup, "Please paste your resume.", "error");
-
-  btnSaveUser.disabled = true;
-  setStatus(statusSetup, "Saving...");
+// ── Complete ──────────────────────────────────────────
+btnComplete.addEventListener("click", async () => {
+  btnComplete.disabled = true;
+  setStatus(statusPinned, "Saving...");
 
   try {
-    const data = await apiFetch("/save-user", {
+    const job_id = await apiFetch("/save-job", {
       method: "POST",
-      body: JSON.stringify({ name, base_resume_text: resume }),
-    });
-    currentUsername = data.name;
-    setHeaderUser(data.name);
-    showView("main");
+      body: JSON.stringify({
+        job_title:       pinnedJob.title,
+        company:         pinnedJob.company,
+        job_description: pinnedJob.description,
+        job_url:         pinnedJob.url,
+      }),
+    }).then(d => d.job_id);
+
+    if (coverLetter) {
+      await apiFetch("/save-cover-letter-by-id", {
+        method: "POST",
+        body: JSON.stringify({ job_id, cover_letter: coverLetter }),
+      });
+    }
+
+    clearPin();
+    pinnedJob   = null;
+    coverLetter = "";
+    setStatus(statusScan, "Application saved! Ready for next job.", "success");
+    showView("scan");
+    scrapeCurrentTab();
   } catch (err) {
-    setStatus(statusSetup, err.message, "error");
+    setStatus(statusPinned, err.message, "error");
   } finally {
-    btnSaveUser.disabled = false;
+    btnComplete.disabled = false;
   }
 });
 
-// Main: view jobs dashboard
-document.getElementById("btn-view-jobs").addEventListener("click", () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
-});
-
-// Main: edit profile
-document.getElementById("btn-edit-profile").addEventListener("click", async () => {
-  setupReturnView           = "main";
-  setupTitle.textContent    = "Edit Profile";
-  setupSubtitle.textContent = "Update your name or resume below.";
-  try {
-    const data = await apiFetch("/user/full");
-    inputName.value   = data.name || "";
-    inputResume.value = data.base_resume_text || "";
-  } catch {
-    inputName.value   = "";
-    inputResume.value = "";
-  }
-  setStatus(statusSetup, "");
-  showView("setup");
-});
-
-// Nav: cover letter card
-document.getElementById("nav-cover-letter").addEventListener("click", () => {
+// ── Cover letter view ─────────────────────────────────
+btnGoCoverLetter.addEventListener("click", () => {
+  clTitle.textContent   = pinnedJob.title   || "—";
+  clCompany.textContent = pinnedJob.company || "—";
+  elTextarea.value      = coverLetter;
+  btnDownload.disabled    = !coverLetter;
+  btnDownloadPdf.disabled = !coverLetter;
+  setStatus(statusCL, "");
   showView("coverLetter");
-  scrapeCurrentTab();
 });
 
-// Cover letter: back
-btnBack.addEventListener("click", () => showView("main"));
-
-// Job description modal
-btnShowDesc.addEventListener("click", () => {
-  modalDescText.textContent = jobData?.description || "No description available.";
-  modalDesc.style.display   = "flex";
-});
-
-btnCloseModal.addEventListener("click", () => {
-  modalDesc.style.display = "none";
-});
-
-modalDesc.addEventListener("click", (e) => {
-  if (e.target === modalDesc) modalDesc.style.display = "none";
-});
-
-// Generate cover letter
 btnGenerate.addEventListener("click", async () => {
-  if (!jobData) return setStatus(statusCL, "No job data found.", "error");
-
+  if (!pinnedJob) return;
   btnGenerate.disabled = true;
   setStatus(statusCL, "Generating...");
-
   try {
     const data = await apiFetch("/generate-cover-letter", {
       method: "POST",
       body: JSON.stringify({
-        job_title:       jobData.title,
-        company:         jobData.company,
-        job_description: jobData.description,
+        job_title:       pinnedJob.title,
+        company:         pinnedJob.company,
+        job_description: pinnedJob.description,
       }),
     });
-    elTextarea.value        = data.cover_letter;
-    btnSaveCL.disabled      = false;
+    coverLetter             = data.cover_letter;
+    elTextarea.value        = coverLetter;
     btnDownload.disabled    = false;
     btnDownloadPdf.disabled = false;
     setStatus(statusCL, "Done! Edit as needed.", "success");
@@ -272,49 +230,33 @@ btnGenerate.addEventListener("click", async () => {
   }
 });
 
-// Save cover letter
-btnSaveCL.addEventListener("click", async () => {
-  const content = elTextarea.value.trim();
-  if (!content) return setStatus(statusCL, "Nothing to save.", "error");
-
-  btnSaveCL.disabled = true;
-  setStatus(statusCL, "Saving...");
-
-  try {
-    await apiFetch("/save-cover-letter", {
-      method: "POST",
-      body: JSON.stringify({
-        job_title:       jobData.title,
-        company:         jobData.company,
-        job_description: jobData.description,
-        job_url:         jobData.url,
-        cover_letter:    content,
-      }),
-    });
-    setStatus(statusCL, "Saved!", "success");
-    btnSaveCL.disabled = true;
-  } catch (err) {
-    setStatus(statusCL, err.message, "error");
-  } finally {
-    btnSaveCL.disabled = false;
-  }
+// Keep coverLetter in sync if user edits the textarea
+elTextarea.addEventListener("input", () => {
+  coverLetter = elTextarea.value;
+  btnDownload.disabled    = !coverLetter.trim();
+  btnDownloadPdf.disabled = !coverLetter.trim();
 });
 
-// Download .txt
+// Back from cover letter → pinned
+document.getElementById("btn-cl-back").addEventListener("click", () => {
+  coverLetter = elTextarea.value.trim();
+  refreshClPreview();
+  showView("pinned");
+});
+
+// ── Downloads ─────────────────────────────────────────
 btnDownload.addEventListener("click", () => {
   const content = elTextarea.value.trim();
   if (!content) return;
-
   const blob = new Blob([content], { type: "text/plain" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href     = url;
-  a.download = `cover-letter-${(jobData?.company || "job").replace(/\s+/g, "-").toLowerCase()}.txt`;
+  a.download = `cover-letter-${(pinnedJob?.company || "job").replace(/\s+/g, "-").toLowerCase()}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 });
 
-// Download PDF
 btnDownloadPdf.addEventListener("click", () => {
   const content = elTextarea.value.trim();
   if (!content) return;
@@ -330,7 +272,7 @@ btnDownloadPdf.addEventListener("click", () => {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.text(`Cover Letter — ${jobData?.title || "Job"}`, margin, margin + 7);
+  doc.text(`Cover Letter — ${pinnedJob?.title || "Job"}`, margin, margin + 7);
 
   let y = margin + 16;
   content.split("\n\n").forEach((para) => {
@@ -340,7 +282,122 @@ btnDownloadPdf.addEventListener("click", () => {
     y += lines.length * 6 + 4;
   });
 
-  const filename = `${currentUsername}_${jobData?.title || "job"}_coverletter.pdf`.replace(/\s+/g, "_");
+  const filename = `${currentUsername}_${pinnedJob?.title || "job"}_coverletter.pdf`.replace(/\s+/g, "_");
   doc.save(filename);
   setStatus(statusCL, "PDF downloaded!", "success");
 });
+
+// ── Description modal ─────────────────────────────────
+document.getElementById("btn-scan-show-desc").addEventListener("click", () => {
+  showDescModal(scannedJob?.description);
+});
+
+document.getElementById("btn-pinned-show-desc").addEventListener("click", () => {
+  showDescModal(pinnedJob?.description);
+});
+
+document.getElementById("btn-close-modal").addEventListener("click", () => {
+  modalDesc.style.display = "none";
+});
+
+modalDesc.addEventListener("click", (e) => {
+  if (e.target === modalDesc) modalDesc.style.display = "none";
+});
+
+// ── JOB_UPDATED from content.js — only update scan view ──
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type !== "JOB_UPDATED") return;
+  if (pinnedJob) return; // ignore while pinned
+  if (!views.scan.classList.contains("active")) return;
+
+  const data = message.data;
+  if (scannedJob && scannedJob.url === data.url && scannedJob.title === data.title) return;
+
+  scannedJob = data;
+  scanTitle.textContent   = data.title   || "Not found";
+  scanCompany.textContent = data.company || "Not found";
+  scanRowDesc.style.display = data.description ? "flex" : "none";
+  btnPin.disabled = !(data.title || data.company);
+  setStatus(statusScan, data.title ? "Job detected — pin it to start." : "", data.title ? "success" : "");
+});
+
+// ── Welcome ───────────────────────────────────────────
+btnContinueAs.addEventListener("click", () => {
+  showView("scan");
+  scrapeCurrentTab();
+});
+
+btnUseDifferent.addEventListener("click", () => {
+  inputName.value   = "";
+  inputResume.value = "";
+  setStatus(statusSetup, "");
+  showView("setup");
+});
+
+// ── Setup ─────────────────────────────────────────────
+btnSetupBack.addEventListener("click", () => showView("welcome"));
+
+btnSaveUser.addEventListener("click", async () => {
+  const name   = inputName.value.trim();
+  const resume = inputResume.value.trim();
+  if (!name)   return setStatus(statusSetup, "Please enter your name.", "error");
+  if (!resume) return setStatus(statusSetup, "Please paste your resume.", "error");
+
+  btnSaveUser.disabled = true;
+  setStatus(statusSetup, "Saving...");
+  try {
+    const data = await apiFetch("/save-user", {
+      method: "POST",
+      body: JSON.stringify({ name, base_resume_text: resume }),
+    });
+    currentUsername = data.name;
+    setHeaderUser(data.name);
+    welcomeUserName.textContent = data.name;
+    showView("welcome");
+  } catch (err) {
+    setStatus(statusSetup, err.message, "error");
+  } finally {
+    btnSaveUser.disabled = false;
+  }
+});
+
+document.getElementById("btn-view-jobs").addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+});
+
+document.getElementById("btn-edit-profile").addEventListener("click", async () => {
+  setupTitle.textContent    = "Edit Profile";
+  setupSubtitle.textContent = "Update your name or resume below.";
+  try {
+    const data = await apiFetch("/user/full");
+    inputName.value   = data.name || "";
+    inputResume.value = data.base_resume_text || "";
+  } catch {
+    inputName.value   = "";
+    inputResume.value = "";
+  }
+  setStatus(statusSetup, "");
+  showView("setup");
+});
+
+// ── Init ──────────────────────────────────────────────
+apiFetch("/user")
+  .then((data) => {
+    if (!data.exists) { showView("setup"); return; }
+    currentUsername = data.name;
+    setHeaderUser(data.name);
+
+    welcomeUserName.textContent = data.name;
+
+    // Restore pin if panel was closed mid-application
+    chrome.storage.session.get("pinnedJob", ({ pinnedJob: saved }) => {
+      if (saved) {
+        pinnedJob = saved;
+        loadPinnedView();
+        showView("pinned");
+      } else {
+        showView("welcome");
+      }
+    });
+  })
+  .catch(() => showView("setup"));
