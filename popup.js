@@ -7,7 +7,13 @@ const views = {
   coverLetter: document.getElementById("view-cover-letter"),
 };
 
-const headerUser  = document.getElementById("header-user");
+const headerUser      = document.getElementById("header-user");
+const headerUserName  = document.getElementById("header-user-name");
+
+function setHeaderUser(name) {
+  headerUserName.textContent = name;
+  headerUser.style.display   = "flex";
+}
 const inputName   = document.getElementById("input-name");
 const inputResume = document.getElementById("resume-input");
 const btnSaveUser = document.getElementById("btn-save-user");
@@ -51,9 +57,8 @@ async function apiFetch(path, options = {}) {
 apiFetch("/user")
   .then((data) => {
     if (data.exists) {
-      headerUser.textContent = `👤 ${data.name}`;
+      setHeaderUser(data.name);
       currentUsername = data.name;
-      showView("main");
     } else {
       showView("setup");
     }
@@ -76,9 +81,9 @@ btnSaveUser.addEventListener("click", async () => {
       method: "POST",
       body: JSON.stringify({ name, base_resume_text: resume }),
     });
-    headerUser.textContent = `👤 ${data.name}`;
-    currentUsername = data.name;
-    showView("main");
+      setHeaderUser(data.name);
+      currentUsername = data.name;
+      showView("main");
   } catch (err) {
     setStatus(statusSetup, err.message, "error");
   } finally {
