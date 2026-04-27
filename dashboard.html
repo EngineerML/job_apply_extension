@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Bid Assist — Jobs Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+
+    <header>
+      <div class="logo">✍️</div>
+      <div class="header-text">
+        <h1>Applied Jobs</h1>
+        <span>Bid Assist Dashboard</span>
+      </div>
+      <button id="btn-refresh" class="btn-ghost btn-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+    </header>
+
+    <main>
+      <div id="loading" class="empty-state">Loading...</div>
+      <div id="empty" class="empty-state" style="display:none">No jobs saved yet. Generate a cover letter to get started.</div>
+
+      <div id="table-wrap" style="display:none">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Job Title</th>
+              <th>Company</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="jobs-tbody"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="modal" class="modal-overlay" style="display:none">
+      <div class="modal-box">
+
+        <div class="modal-header">
+          <div>
+            <div class="modal-job-title" id="modal-title"></div>
+            <div class="modal-job-company" id="modal-company"></div>
+          </div>
+          <button class="modal-close" id="btn-modal-close">×</button>
+        </div>
+
+        <div class="modal-meta">
+          <a id="modal-url" href="#" target="_blank" rel="noopener">Open Job Posting ↗</a>
+          <span id="modal-date" class="modal-date"></span>
+        </div>
+
+        <div class="modal-status-row">
+          <label for="modal-status-select">Status</label>
+          <select id="modal-status-select">
+            <option value="Applied">Applied</option>
+            <option value="Interview">Interview</option>
+            <option value="Accepted">Accepted</option>
+            <option value="Denied">Denied</option>
+          </select>
+          <span id="modal-status-msg" class="status-msg"></span>
+        </div>
+
+        <div class="modal-tabs">
+          <button class="tab-btn active" data-tab="description">Job Description</button>
+          <button class="tab-btn" data-tab="cover-letter">Cover Letter</button>
+        </div>
+
+        <div class="modal-content">
+          <div id="tab-description" class="tab-panel active"></div>
+          <div id="tab-cover-letter" class="tab-panel" style="display:none"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+  </body>
+</html>

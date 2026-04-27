@@ -96,6 +96,27 @@ function scrapeCurrentTab() {
   });
 }
 
+// Listen for dynamic job updates pushed from content.js
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type !== "JOB_UPDATED") return;
+  const data = message.data;
+  // Only update if cover letter view is active and data is different
+  if (!views.coverLetter.classList.contains("active")) return;
+  if (jobData && jobData.url === data.url && jobData.title === data.title) return;
+
+  jobData = data;
+  elTitle.textContent   = data.title   || "Not found";
+  elCompany.textContent = data.company || "Not found";
+  rowShowDesc.style.display = data.description ? "flex" : "none";
+  setStatus(statusCL, "Job updated — ready to generate.", "success");
+
+  // Reset cover letter area for the new job
+  elTextarea.value     = "";
+  btnSaveCL.disabled   = true;
+  btnDownload.disabled = true;
+  btnDownloadPdf.disabled = true;
+});
+
 // Init: check if user exists
 apiFetch("/user")
   .then((data) => {
@@ -155,6 +176,11 @@ btnSaveUser.addEventListener("click", async () => {
   } finally {
     btnSaveUser.disabled = false;
   }
+});
+
+// Main: view jobs dashboard
+document.getElementById("btn-view-jobs").addEventListener("click", () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
 });
 
 // Main: edit profile

@@ -9,55 +9,40 @@ function scrapeJobData() {
     return "";
   };
 
-  // Title
   const title = get([
-    // LinkedIn
     ".job-details-jobs-unified-top-card__job-title h1",
     ".jobs-unified-top-card__job-title h1",
     ".t-24.t-bold",
-    // Indeed
     "h1.jobsearch-JobInfoHeader-title",
     "[data-testid='jobsearch-JobInfoHeader-title']",
-    // Glassdoor
     "[data-test='job-title']",
-    // Generic
     "h1.job-title",
     "h1[class*='title']",
     "h1[class*='job']",
     "h1",
   ]);
 
-  // Company
   const company = get([
-    // LinkedIn
     ".job-details-jobs-unified-top-card__company-name a",
     ".job-details-jobs-unified-top-card__company-name",
     ".jobs-unified-top-card__company-name a",
-    // Indeed
     "[data-testid='inlineHeader-companyName'] a",
     ".jobsearch-InlineCompanyRating-companyName",
-    // Glassdoor
     "[data-test='employer-name']",
-    // Generic
     "[class*='company-name']",
     "[class*='companyName']",
     "[data-company-name]",
   ]);
 
-  // Description — try known selectors first, then fall back to largest text block
-  const description = get([
-    // LinkedIn
+  let description = get([
     "#job-details",
     ".jobs-description__content .jobs-box__html-content",
     ".jobs-description-content__text",
-    // Indeed
     "#jobDescriptionText",
     ".jobsearch-jobDescriptionText",
     "[data-testid='jobsearch-jobDescriptionText']",
-    // Glassdoor
     "[data-test='description']",
     ".jobDescriptionContent",
-    // Generic
     "[class*='job-description']",
     "[class*='jobDescription']",
     "[id*='job-description']",
@@ -66,7 +51,6 @@ function scrapeJobData() {
     "[role='main']",
   ]);
 
-  // Smart fallback: find the element with the most text on the page
   if (!description) {
     const candidates = document.querySelectorAll("div, section, article");
     let best = { el: null, len: 0 };
@@ -74,26 +58,57 @@ function scrapeJobData() {
       const len = el.innerText?.trim().length || 0;
       if (len > best.len && len < 20000) best = { el, len };
     });
-    if (best.el) {
-      return {
-        title,
-        company,
-        description: best.el.innerText.trim().slice(0, 4000),
-        url: window.location.href,
-      };
-    }
+    if (best.el) description = best.el.innerText.trim();
   }
 
   return {
     title,
     company,
-    description: description.slice(0, 4000),
+    description: (description || "").slice(0, 4000),
     url: window.location.href,
   };
 }
 
+// Respond to manual scrape requests from popup
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "SCRAPE_JOB") {
     sendResponse(scrapeJobData());
   }
 });
+
+// Dynamic detection: watch for URL changes and DOM mutations
+let lastUrl = location.href;
+let debounceTimer = null;
+
+function notifyIfChanged() {
+  const data = scrapeJobData();
+  // Only notify if something meaningful actually changed
+  if (data.title || data.description) {
+    chrome.runtime.sendMessage({ type: "JOB_UPDATED", data });
+  }
+}
+
+function scheduleNotify() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(notifyIfChanged, 800);
+}
+
+// Watch for URL changes (SPA navigation — LinkedIn, Indeed use this)
+const urlObserver = new MutationObserver(() => {
+  if (location.href !== lastUrl) {
+    lastUrl = location.href;
+    scheduleNotify();
+  }
+});
+
+urlObserver.observe(document.body, { childList: true, subtree: true });
+
+// Also watch for significant content changes in the main area
+const contentObserver = new MutationObserver((mutations) => {
+  const significant = mutations.some(
+    (m) => m.addedNodes.length > 2 || m.removedNodes.length > 2
+  );
+  if (significant) scheduleNotify();
+});
+
+contentObserver.observe(document.body, { childList: true, subtree: true });

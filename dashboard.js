@@ -1,0 +1,167 @@
+const API_BASE = "http://localhost:8000";
+
+const tbody         = document.getElementById("jobs-tbody");
+const tableWrap     = document.getElementById("table-wrap");
+const loadingEl     = document.getElementById("loading");
+const emptyEl       = document.getElementById("empty");
+const modal         = document.getElementById("modal");
+const modalTitle    = document.getElementById("modal-title");
+const modalCompany  = document.getElementById("modal-company");
+const modalUrl      = document.getElementById("modal-url");
+const modalDate     = document.getElementById("modal-date");
+const modalStatus   = document.getElementById("modal-status-select");
+const modalStatusMsg = document.getElementById("modal-status-msg");
+const tabDesc       = document.getElementById("tab-description");
+const tabCL         = document.getElementById("tab-cover-letter");
+
+let currentJobId = null;
+
+// Helpers
+function formatDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function statusClass(s) {
+  return `status-badge status-${s || "Applied"}`;
+}
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Request failed");
+  return data;
+}
+
+// Load and render jobs
+async function loadJobs() {
+  loadingEl.style.display = "block";
+  tableWrap.style.display = "none";
+  emptyEl.style.display   = "none";
+
+  try {
+    const jobs = await apiFetch("/jobs");
+
+    loadingEl.style.display = "none";
+
+    if (!jobs.length) {
+      emptyEl.style.display = "block";
+      return;
+    }
+
+    tbody.innerHTML = "";
+    jobs.forEach((job) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="date-cell">${formatDate(job.created_at)}</td>
+        <td class="title-cell" title="${job.title || ""}">${job.title || "—"}</td>
+        <td class="company-cell" title="${job.company || ""}">${job.company || "—"}</td>
+        <td><span class="${statusClass(job.status)}">${job.status || "Applied"}</span></td>
+        <td><button class="btn-view" data-id="${job.id}">View</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Store jobs for modal lookup
+    window._jobs = jobs;
+    tableWrap.style.display = "block";
+
+    // Attach view button listeners
+    tbody.querySelectorAll(".btn-view").forEach((btn) => {
+      btn.addEventListener("click", () => openModal(btn.dataset.id));
+    });
+
+  } catch (err) {
+    loadingEl.textContent = `Error: ${err.message}`;
+  }
+}
+
+// Open modal
+function openModal(jobId) {
+  const job = window._jobs.find((j) => j.id === jobId);
+  if (!job) return;
+
+  currentJobId = jobId;
+
+  modalTitle.textContent   = job.title   || "—";
+  modalCompany.textContent = job.company || "—";
+  modalDate.textContent    = formatDate(job.created_at);
+  modalUrl.href            = job.url || "#";
+  modalUrl.textContent     = job.url ? "Open Job Posting ↗" : "No URL saved";
+
+  modalStatus.value = job.status || "Applied";
+  modalStatusMsg.textContent = "";
+
+  tabDesc.textContent = job.description || "";
+  tabDesc.className   = `tab-panel${job.description ? "" : " empty"}`;
+  if (!job.description) tabDesc.textContent = "No description saved.";
+
+  tabCL.textContent = job.cover_letter || "";
+  tabCL.className   = `tab-panel${job.cover_letter ? "" : " empty"}`;
+  if (!job.cover_letter) tabCL.textContent = "No cover letter saved for this job.";
+
+  // Reset to description tab
+  switchTab("description");
+
+  modal.style.display = "flex";
+}
+
+// Tab switching
+function switchTab(name) {
+  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelector(`[data-tab="${name}"]`).classList.add("active");
+  tabDesc.style.display = name === "description" ? "block" : "none";
+  tabCL.style.display   = name === "cover-letter" ? "block" : "none";
+}
+
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+// Status update
+modalStatus.addEventListener("change", async () => {
+  if (!currentJobId) return;
+  const status = modalStatus.value;
+  try {
+    await apiFetch(`/jobs/${currentJobId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+    modalStatusMsg.textContent = "Saved!";
+    setTimeout(() => { modalStatusMsg.textContent = ""; }, 2000);
+
+    // Update badge in table row without full reload
+    const job = window._jobs.find((j) => j.id === currentJobId);
+    if (job) {
+      job.status = status;
+      const badge = tbody.querySelector(`[data-id="${currentJobId}"]`)
+        ?.closest("tr")
+        ?.querySelector(".status-badge");
+      if (badge) {
+        badge.className   = statusClass(status);
+        badge.textContent = status;
+      }
+    }
+  } catch (err) {
+    modalStatusMsg.style.color = "#f87171";
+    modalStatusMsg.textContent = err.message;
+  }
+});
+
+// Close modal
+document.getElementById("btn-modal-close").addEventListener("click", () => {
+  modal.style.display = "none";
+});
+
+modal.addEventListener("click", (e) => {
+  if (e.target === modal) modal.style.display = "none";
+});
+
+// Refresh
+document.getElementById("btn-refresh").addEventListener("click", loadJobs);
+
+// Init
+loadJobs();
