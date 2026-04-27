@@ -3,11 +3,13 @@
   "name": "Bid Assist",
   "version": "1.0",
   "description": "Generate tailored cover letters from job listings",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
   "host_permissions": ["<all_urls>"],
   "action": {
-    "default_popup": "popup.html",
     "default_title": "Bid Assist"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
   },
   "background": {
     "service_worker": "background.js"

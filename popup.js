@@ -1,38 +1,49 @@
 const API_BASE = "http://localhost:8000";
 
-// ── DOM refs ──────────────────────────────────────────────
+// DOM refs
 const views = {
+  welcome:     document.getElementById("view-welcome"),
   setup:       document.getElementById("view-setup"),
   main:        document.getElementById("view-main"),
   coverLetter: document.getElementById("view-cover-letter"),
 };
 
-const headerUser      = document.getElementById("header-user");
-const headerUserName  = document.getElementById("header-user-name");
+const headerUser     = document.getElementById("header-user");
+const headerUserName = document.getElementById("header-user-name");
 
-function setHeaderUser(name) {
-  headerUserName.textContent = name;
-  headerUser.style.display   = "flex";
-}
+const welcomeUserName = document.getElementById("welcome-user-name");
+const btnContinueAs   = document.getElementById("btn-continue-as");
+const btnUseDifferent = document.getElementById("btn-use-different");
+
 const inputName   = document.getElementById("input-name");
 const inputResume = document.getElementById("resume-input");
 const btnSaveUser = document.getElementById("btn-save-user");
-const statusSetup = document.getElementById("status-setup");
+const btnSetupBack = document.getElementById("btn-setup-back");
+const setupTitle   = document.getElementById("setup-title");
+const setupSubtitle = document.getElementById("setup-subtitle");
+const statusSetup  = document.getElementById("status-setup");
 
-const elTitle     = document.getElementById("job-title");
-const elCompany   = document.getElementById("job-company");
-const elTextarea  = document.getElementById("cover-letter");
-const btnGenerate   = document.getElementById("btn-generate");
-const btnSaveCL     = document.getElementById("btn-save-cl");
-const btnDownload   = document.getElementById("btn-download");
+const elTitle        = document.getElementById("job-title");
+const elCompany      = document.getElementById("job-company");
+const elTextarea     = document.getElementById("cover-letter");
+const btnGenerate    = document.getElementById("btn-generate");
+const btnSaveCL      = document.getElementById("btn-save-cl");
+const btnDownload    = document.getElementById("btn-download");
 const btnDownloadPdf = document.getElementById("btn-download-pdf");
-const statusCL      = document.getElementById("status-cl");
-const btnBack       = document.getElementById("btn-back");
+const statusCL       = document.getElementById("status-cl");
+const btnBack        = document.getElementById("btn-back");
 
-let jobData = null;
+const rowShowDesc   = document.getElementById("row-show-desc");
+const btnShowDesc   = document.getElementById("btn-show-desc");
+const modalDesc     = document.getElementById("modal-desc");
+const modalDescText = document.getElementById("modal-desc-text");
+const btnCloseModal = document.getElementById("btn-close-modal");
+
+let jobData         = null;
 let currentUsername = "";
+let setupReturnView = "welcome"; // where setup back btn returns to
 
-// ── Helpers ───────────────────────────────────────────────
+// Helpers
 function showView(name) {
   Object.values(views).forEach((v) => v.classList.remove("active"));
   views[name].classList.add("active");
@@ -41,6 +52,11 @@ function showView(name) {
 function setStatus(el, msg, type = "") {
   el.textContent = msg;
   el.className = `status ${type}`;
+}
+
+function setHeaderUser(name) {
+  headerUserName.textContent = name;
+  headerUser.style.display   = "flex";
 }
 
 async function apiFetch(path, options = {}) {
@@ -53,19 +69,69 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
-// ── Init: check if user exists ────────────────────────────
+// Fix for side panel: inject scraper directly via scripting API
+// instead of messaging content script (which may not be injected yet)
+function scrapeCurrentTab() {
+  chrome.tabs.query({ active: true, lastFocusedWindow: true }, ([tab]) => {
+    if (!tab) {
+      setStatus(statusCL, "Could not find active tab.", "error");
+      return;
+    }
+    chrome.scripting.executeScript(
+      { target: { tabId: tab.id }, files: ["content.js"] },
+      () => {
+        chrome.tabs.sendMessage(tab.id, { type: "SCRAPE_JOB" }, (data) => {
+          if (chrome.runtime.lastError || !data) {
+            setStatus(statusCL, "Could not scrape page. Try refreshing the tab.", "error");
+            return;
+          }
+          jobData = data;
+          elTitle.textContent   = data.title   || "Not found";
+          elCompany.textContent = data.company || "Not found";
+          rowShowDesc.style.display = data.description ? "flex" : "none";
+          setStatus(statusCL, "Job data detected.", "success");
+        });
+      }
+    );
+  });
+}
+
+// Init: check if user exists
 apiFetch("/user")
   .then((data) => {
     if (data.exists) {
-      setHeaderUser(data.name);
       currentUsername = data.name;
+      setHeaderUser(data.name);
+      welcomeUserName.textContent = data.name;
+      showView("welcome");
     } else {
+      setupReturnView = "welcome";
       showView("setup");
     }
   })
-  .catch(() => showView("setup"));
+  .catch(() => {
+    setupReturnView = "welcome";
+    showView("setup");
+  });
 
-// ── Setup: save user ──────────────────────────────────────
+// Welcome: continue
+btnContinueAs.addEventListener("click", () => showView("main"));
+
+// Welcome: use different account
+btnUseDifferent.addEventListener("click", () => {
+  setupReturnView           = "welcome";
+  setupTitle.textContent    = "Set up your profile";
+  setupSubtitle.textContent = "Enter your name and resume to get started.";
+  inputName.value   = "";
+  inputResume.value = "";
+  setStatus(statusSetup, "");
+  showView("setup");
+});
+
+// Setup: back button — returns to wherever we came from
+btnSetupBack.addEventListener("click", () => showView(setupReturnView));
+
+// Setup: save user
 btnSaveUser.addEventListener("click", async () => {
   const name   = inputName.value.trim();
   const resume = inputResume.value.trim();
@@ -74,16 +140,16 @@ btnSaveUser.addEventListener("click", async () => {
   if (!resume) return setStatus(statusSetup, "Please paste your resume.", "error");
 
   btnSaveUser.disabled = true;
-  setStatus(statusSetup, "Saving…");
+  setStatus(statusSetup, "Saving...");
 
   try {
     const data = await apiFetch("/save-user", {
       method: "POST",
       body: JSON.stringify({ name, base_resume_text: resume }),
     });
-      setHeaderUser(data.name);
-      currentUsername = data.name;
-      showView("main");
+    currentUsername = data.name;
+    setHeaderUser(data.name);
+    showView("main");
   } catch (err) {
     setStatus(statusSetup, err.message, "error");
   } finally {
@@ -91,8 +157,11 @@ btnSaveUser.addEventListener("click", async () => {
   }
 });
 
-// ── Edit profile ─────────────────────────────────────────
+// Main: edit profile
 document.getElementById("btn-edit-profile").addEventListener("click", async () => {
+  setupReturnView           = "main";
+  setupTitle.textContent    = "Edit Profile";
+  setupSubtitle.textContent = "Update your name or resume below.";
   try {
     const data = await apiFetch("/user/full");
     inputName.value   = data.name || "";
@@ -105,32 +174,35 @@ document.getElementById("btn-edit-profile").addEventListener("click", async () =
   showView("setup");
 });
 
-// ── Nav: cover letter card ────────────────────────────────
+// Nav: cover letter card
 document.getElementById("nav-cover-letter").addEventListener("click", () => {
   showView("coverLetter");
-
-  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-    chrome.tabs.sendMessage(tab.id, { type: "SCRAPE_JOB" }, (data) => {
-      if (chrome.runtime.lastError || !data) {
-        setStatus(statusCL, "Could not scrape page.", "error");
-        return;
-      }
-      jobData = data;
-      elTitle.textContent   = data.title   || "Not found";
-      elCompany.textContent = data.company || "Not found";
-    });
-  });
+  scrapeCurrentTab();
 });
 
-// ── Back ──────────────────────────────────────────────────
+// Cover letter: back
 btnBack.addEventListener("click", () => showView("main"));
 
-// ── Generate cover letter ─────────────────────────────────
+// Job description modal
+btnShowDesc.addEventListener("click", () => {
+  modalDescText.textContent = jobData?.description || "No description available.";
+  modalDesc.style.display   = "flex";
+});
+
+btnCloseModal.addEventListener("click", () => {
+  modalDesc.style.display = "none";
+});
+
+modalDesc.addEventListener("click", (e) => {
+  if (e.target === modalDesc) modalDesc.style.display = "none";
+});
+
+// Generate cover letter
 btnGenerate.addEventListener("click", async () => {
   if (!jobData) return setStatus(statusCL, "No job data found.", "error");
 
   btnGenerate.disabled = true;
-  setStatus(statusCL, "Generating…");
+  setStatus(statusCL, "Generating...");
 
   try {
     const data = await apiFetch("/generate-cover-letter", {
@@ -153,13 +225,13 @@ btnGenerate.addEventListener("click", async () => {
   }
 });
 
-// ── Save cover letter ─────────────────────────────────────
+// Save cover letter
 btnSaveCL.addEventListener("click", async () => {
   const content = elTextarea.value.trim();
   if (!content) return setStatus(statusCL, "Nothing to save.", "error");
 
   btnSaveCL.disabled = true;
-  setStatus(statusCL, "Saving…");
+  setStatus(statusCL, "Saving...");
 
   try {
     await apiFetch("/save-cover-letter", {
@@ -172,7 +244,7 @@ btnSaveCL.addEventListener("click", async () => {
         cover_letter:    content,
       }),
     });
-    setStatus(statusCL, "Saved ✓", "success");
+    setStatus(statusCL, "Saved!", "success");
   } catch (err) {
     setStatus(statusCL, err.message, "error");
   } finally {
@@ -180,7 +252,7 @@ btnSaveCL.addEventListener("click", async () => {
   }
 });
 
-// ── Download .txt ─────────────────────────────────────────
+// Download .txt
 btnDownload.addEventListener("click", () => {
   const content = elTextarea.value.trim();
   if (!content) return;
@@ -194,13 +266,13 @@ btnDownload.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-// ── Download PDF ──────────────────────────────────────────
+// Download PDF
 btnDownloadPdf.addEventListener("click", async () => {
   const content = elTextarea.value.trim();
   if (!content) return;
 
   btnDownloadPdf.disabled = true;
-  setStatus(statusCL, "Generating PDF…");
+  setStatus(statusCL, "Generating PDF...");
 
   try {
     const res = await fetch(`${API_BASE}/download-pdf`, {
@@ -222,7 +294,7 @@ btnDownloadPdf.addEventListener("click", async () => {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    setStatus(statusCL, "PDF downloaded ✓", "success");
+    setStatus(statusCL, "PDF downloaded!", "success");
   } catch (err) {
     setStatus(statusCL, err.message, "error");
   } finally {

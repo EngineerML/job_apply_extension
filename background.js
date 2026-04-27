@@ -1,2 +1,4 @@
-// Service worker required by manifest.json
-// API calls are made directly from popup.js to avoid MV3 service worker lifecycle issues
+// Set the side panel to open on action click
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch(console.error);

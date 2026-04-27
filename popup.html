@@ -20,12 +20,48 @@
       </div>
     </header>
 
-    <!-- ── View: Setup ── -->
-    <div id="view-setup" class="view active">
+    <!-- ── View: Welcome back (existing user) ── -->
+    <div id="view-welcome" class="view">
       <div class="view-body">
         <div class="setup-header">
-          <div class="view-title">Welcome to Bid Assist</div>
-          <div class="view-subtitle">Set up your profile to start generating tailored cover letters.</div>
+          <div class="view-title">Welcome back 👋</div>
+          <div class="view-subtitle">Continue as your saved profile or set up a new one.</div>
+        </div>
+
+        <div class="user-card" id="welcome-user-card">
+          <div class="user-card-avatar">👤</div>
+          <div class="user-card-info">
+            <div class="user-card-name" id="welcome-user-name">—</div>
+            <div class="user-card-sub">Saved profile</div>
+          </div>
+          <div class="user-card-check">✓</div>
+        </div>
+
+        <button id="btn-continue-as" class="btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          Continue
+        </button>
+
+        <button id="btn-use-different" class="btn-ghost">
+          Use different account
+        </button>
+      </div>
+    </div>
+
+    <!-- ── View: Setup (new user / edit profile) ── -->
+    <div id="view-setup" class="view">
+      <div class="view-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <button class="back-btn" id="btn-setup-back">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+          </button>
+          <span id="setup-view-label" style="font-size:11px;color:#6b6b80;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Profile</span>
+        </div>
+
+        <div class="setup-header">
+          <div class="view-title" id="setup-title">Set up your profile</div>
+          <div class="view-subtitle" id="setup-subtitle">Enter your name and resume to get started.</div>
         </div>
 
         <div class="field">
@@ -66,7 +102,7 @@
           </div>
           <div class="nav-card disabled" id="nav-resume-tailor">
             <div class="badge">Soon</div>
-            <div class="card-icon" style="background: linear-gradient(135deg,#374151,#4b5563)">🔧</div>
+            <div class="card-icon" style="background:linear-gradient(135deg,#374151,#4b5563)">🔧</div>
             <div>
               <div class="card-label">Resume Tailor</div>
               <div class="card-desc">Adapt your resume to match job requirements</div>
@@ -86,7 +122,7 @@
     <!-- ── View: Cover Letter ── -->
     <div id="view-cover-letter" class="view">
       <div class="view-body">
-        <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
           <button class="back-btn" id="btn-back">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             Back
@@ -102,6 +138,23 @@
           <div class="job-info-row">
             <span class="info-label">Company</span>
             <span class="info-value" id="job-company">—</span>
+          </div>
+          <div class="job-info-row" id="row-show-desc" style="display:none;margin-top:4px;">
+            <button id="btn-show-desc" class="btn-ghost" style="padding:5px 10px;font-size:11px;width:auto;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Show Job Description
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Job description modal ── -->
+        <div id="modal-desc" class="modal-overlay" style="display:none;">
+          <div class="modal-box">
+            <div class="modal-header">
+              <span class="modal-title">Job Description</span>
+              <button id="btn-close-modal" class="modal-close">×</button>
+            </div>
+            <div class="modal-body" id="modal-desc-text"></div>
           </div>
         </div>
 
