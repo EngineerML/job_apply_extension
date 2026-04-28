@@ -74,6 +74,76 @@
           <textarea id="resume-input" placeholder="Paste your full resume text here…"></textarea>
         </div>
 
+        <div class="section-label">Autofill Info <span class="section-optional">(optional)</span></div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="input-first-name">First Name</label>
+            <input type="text" id="input-first-name" placeholder="Jane" />
+          </div>
+          <div class="field">
+            <label for="input-last-name">Last Name</label>
+            <input type="text" id="input-last-name" placeholder="Doe" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="input-email">Email</label>
+          <input type="text" id="input-email" placeholder="jane@example.com" />
+        </div>
+
+        <div class="field">
+          <label for="input-phone">Phone</label>
+          <input type="text" id="input-phone" placeholder="+1 555 000 0000" />
+        </div>
+
+        <div class="field">
+          <label for="input-street">Street Address</label>
+          <input type="text" id="input-street" placeholder="123 Main St" />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="input-city">City</label>
+            <input type="text" id="input-city" placeholder="New York" />
+          </div>
+          <div class="field">
+            <label for="input-state">State</label>
+            <input type="text" id="input-state" placeholder="NY" />
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="input-country">Country</label>
+            <input type="text" id="input-country" placeholder="US" />
+          </div>
+          <div class="field">
+            <label for="input-zip">ZIP Code</label>
+            <input type="text" id="input-zip" placeholder="10001" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="input-salary">Desired Salary</label>
+          <input type="text" id="input-salary" placeholder="80000" />
+        </div>
+
+        <div class="field">
+          <label for="input-race">Race / Ethnicity</label>
+          <input type="text" id="input-race" placeholder="e.g. Asian, White, Hispanic…" />
+        </div>
+
+        <div class="field">
+          <label for="input-veteran">Veteran Status</label>
+          <input type="text" id="input-veteran" placeholder="e.g. Not a veteran" />
+        </div>
+
+        <div class="field">
+          <label for="input-disability">Disability Status</label>
+          <input type="text" id="input-disability" placeholder="e.g. No disability" />
+        </div>
+
         <button id="btn-save-user" class="btn-primary">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           Save &amp; Continue
@@ -136,6 +206,14 @@
     <div id="view-pinned" class="view">
       <div class="view-body">
 
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <button class="back-btn" id="btn-pinned-back">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Back
+          </button>
+          <span style="font-size:11px;color:#6b6b80;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Pinned Job</span>
+        </div>
+
         <div class="pinned-header">
           <div class="pin-badge">📌 Pinned</div>
           <div class="view-title" id="pinned-title">—</div>
@@ -157,6 +235,11 @@
         <button id="btn-go-cover-letter" class="btn-primary">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           Cover Letter
+        </button>
+
+        <button id="btn-autofill" class="btn-outline">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Autofill Form
         </button>
 
         <button id="btn-complete" class="btn-success">

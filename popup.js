@@ -26,6 +26,21 @@ const setupTitle    = document.getElementById("setup-title");
 const setupSubtitle = document.getElementById("setup-subtitle");
 const statusSetup   = document.getElementById("status-setup");
 
+// Profile autofill fields
+const inputFirstName  = document.getElementById("input-first-name");
+const inputLastName   = document.getElementById("input-last-name");
+const inputEmail      = document.getElementById("input-email");
+const inputPhone      = document.getElementById("input-phone");
+const inputStreet     = document.getElementById("input-street");
+const inputCity       = document.getElementById("input-city");
+const inputState      = document.getElementById("input-state");
+const inputCountry    = document.getElementById("input-country");
+const inputZip        = document.getElementById("input-zip");
+const inputSalary     = document.getElementById("input-salary");
+const inputRace       = document.getElementById("input-race");
+const inputVeteran    = document.getElementById("input-veteran");
+const inputDisability = document.getElementById("input-disability");
+
 // Scan
 const scanTitle      = document.getElementById("scan-title");
 const scanCompany    = document.getElementById("scan-company");
@@ -40,6 +55,7 @@ const pinnedRowDesc  = document.getElementById("pinned-row-desc");
 const pinnedClPreview = document.getElementById("pinned-cl-preview");
 const pinnedClText   = document.getElementById("pinned-cl-text");
 const btnGoCoverLetter = document.getElementById("btn-go-cover-letter");
+const btnAutofill    = document.getElementById("btn-autofill");
 const btnComplete    = document.getElementById("btn-complete");
 const statusPinned   = document.getElementById("status-pinned");
 
@@ -191,6 +207,44 @@ btnComplete.addEventListener("click", async () => {
     setStatus(statusPinned, err.message, "error");
   } finally {
     btnComplete.disabled = false;
+  }
+});
+
+// ── Back from pinned view ─────────────────────────────
+document.getElementById("btn-pinned-back").addEventListener("click", () => {
+  clearPin();
+  pinnedJob = null;
+  coverLetter = "";
+  setStatus(statusPinned, "");
+  showView("scan");
+  scrapeCurrentTab();
+});
+
+// ── Autofill ──────────────────────────────────────────
+btnAutofill.addEventListener("click", async () => {
+  btnAutofill.disabled = true;
+  setStatus(statusPinned, "Filling form...");
+  try {
+    const profile = await apiFetch("/profile");
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, ([tab]) => {
+      if (!tab) { setStatus(statusPinned, "No active tab.", "error"); btnAutofill.disabled = false; return; }
+      chrome.scripting.executeScript(
+        { target: { tabId: tab.id }, files: ["autofill.js"] },
+        () => {
+          chrome.tabs.sendMessage(tab.id, { type: "AUTOFILL", profile }, (res) => {
+            btnAutofill.disabled = false;
+            if (chrome.runtime.lastError || !res) {
+              setStatus(statusPinned, "Autofill failed. Try refreshing.", "error");
+              return;
+            }
+            setStatus(statusPinned, `Filled ${res.filled} field(s).`, res.filled > 0 ? "success" : "");
+          });
+        }
+      );
+    });
+  } catch (err) {
+    btnAutofill.disabled = false;
+    setStatus(statusPinned, err.message, "error");
   }
 });
 
@@ -346,13 +400,33 @@ btnSaveUser.addEventListener("click", async () => {
   btnSaveUser.disabled = true;
   setStatus(statusSetup, "Saving...");
   try {
-    const data = await apiFetch("/save-user", {
-      method: "POST",
-      body: JSON.stringify({ name, base_resume_text: resume }),
-    });
-    currentUsername = data.name;
-    setHeaderUser(data.name);
-    welcomeUserName.textContent = data.name;
+    const [userData] = await Promise.all([
+      apiFetch("/save-user", {
+        method: "POST",
+        body: JSON.stringify({ name, base_resume_text: resume }),
+      }),
+      apiFetch("/profile", {
+        method: "POST",
+        body: JSON.stringify({
+          first_name:     inputFirstName.value.trim()  || null,
+          last_name:      inputLastName.value.trim()   || null,
+          email:          inputEmail.value.trim()      || null,
+          phone:          inputPhone.value.trim()      || null,
+          street:         inputStreet.value.trim()     || null,
+          city:           inputCity.value.trim()       || null,
+          state:          inputState.value.trim()      || null,
+          country:        inputCountry.value.trim()    || null,
+          zip:            inputZip.value.trim()        || null,
+          desired_salary: inputSalary.value.trim()     || null,
+          race:           inputRace.value.trim()       || null,
+          veteran:        inputVeteran.value.trim()    || null,
+          disability:     inputDisability.value.trim() || null,
+        }),
+      }),
+    ]);
+    currentUsername = userData.name;
+    setHeaderUser(userData.name);
+    welcomeUserName.textContent = userData.name;
     showView("welcome");
   } catch (err) {
     setStatus(statusSetup, err.message, "error");
@@ -369,11 +443,24 @@ document.getElementById("btn-edit-profile").addEventListener("click", async () =
   setupTitle.textContent    = "Edit Profile";
   setupSubtitle.textContent = "Update your name or resume below.";
   try {
-    const data = await apiFetch("/user/full");
-    inputName.value   = data.name || "";
-    inputResume.value = data.base_resume_text || "";
+    const [user, profile] = await Promise.all([apiFetch("/user/full"), apiFetch("/profile")]);
+    inputName.value         = user.name || "";
+    inputResume.value       = user.base_resume_text || "";
+    inputFirstName.value    = profile.first_name    || "";
+    inputLastName.value     = profile.last_name     || "";
+    inputEmail.value        = profile.email         || "";
+    inputPhone.value        = profile.phone         || "";
+    inputStreet.value       = profile.street        || "";
+    inputCity.value         = profile.city          || "";
+    inputState.value        = profile.state         || "";
+    inputCountry.value      = profile.country       || "";
+    inputZip.value          = profile.zip           || "";
+    inputSalary.value       = profile.desired_salary || "";
+    inputRace.value         = profile.race          || "";
+    inputVeteran.value      = profile.veteran       || "";
+    inputDisability.value   = profile.disability    || "";
   } catch {
-    inputName.value   = "";
+    inputName.value = "";
     inputResume.value = "";
   }
   setStatus(statusSetup, "");
