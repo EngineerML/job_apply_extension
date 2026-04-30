@@ -26,7 +26,7 @@ const setupTitle    = document.getElementById("setup-title");
 const setupSubtitle = document.getElementById("setup-subtitle");
 const statusSetup   = document.getElementById("status-setup");
 
-// Profile autofill fields
+// Profile fields
 const inputFirstName  = document.getElementById("input-first-name");
 const inputLastName   = document.getElementById("input-last-name");
 const inputEmail      = document.getElementById("input-email");
@@ -55,7 +55,6 @@ const pinnedRowDesc  = document.getElementById("pinned-row-desc");
 const pinnedClPreview = document.getElementById("pinned-cl-preview");
 const pinnedClText   = document.getElementById("pinned-cl-text");
 const btnGoCoverLetter = document.getElementById("btn-go-cover-letter");
-const btnAutofill    = document.getElementById("btn-autofill");
 const btnComplete    = document.getElementById("btn-complete");
 const statusPinned   = document.getElementById("status-pinned");
 
@@ -220,34 +219,6 @@ document.getElementById("btn-pinned-back").addEventListener("click", () => {
   scrapeCurrentTab();
 });
 
-// ── Autofill ──────────────────────────────────────────
-btnAutofill.addEventListener("click", async () => {
-  btnAutofill.disabled = true;
-  setStatus(statusPinned, "Filling form...");
-  try {
-    const profile = await apiFetch("/profile");
-    chrome.tabs.query({ active: true, lastFocusedWindow: true }, ([tab]) => {
-      if (!tab) { setStatus(statusPinned, "No active tab.", "error"); btnAutofill.disabled = false; return; }
-      chrome.scripting.executeScript(
-        { target: { tabId: tab.id }, files: ["autofill.js"] },
-        () => {
-          chrome.tabs.sendMessage(tab.id, { type: "AUTOFILL", profile }, (res) => {
-            btnAutofill.disabled = false;
-            if (chrome.runtime.lastError || !res) {
-              setStatus(statusPinned, "Autofill failed. Try refreshing.", "error");
-              return;
-            }
-            setStatus(statusPinned, `Filled ${res.filled} field(s).`, res.filled > 0 ? "success" : "");
-          });
-        }
-      );
-    });
-  } catch (err) {
-    btnAutofill.disabled = false;
-    setStatus(statusPinned, err.message, "error");
-  }
-});
-
 // ── Cover letter view ─────────────────────────────────
 btnGoCoverLetter.addEventListener("click", () => {
   clTitle.textContent   = pinnedJob.title   || "—";
@@ -399,6 +370,25 @@ btnSaveUser.addEventListener("click", async () => {
 
   btnSaveUser.disabled = true;
   setStatus(statusSetup, "Saving...");
+  
+  const profileData = {
+    first_name:     inputFirstName.value.trim()  || null,
+    last_name:      inputLastName.value.trim()   || null,
+    email:          inputEmail.value.trim()      || null,
+    phone:          inputPhone.value.trim()      || null,
+    street:         inputStreet.value.trim()     || null,
+    city:           inputCity.value.trim()       || null,
+    state:          inputState.value.trim()      || null,
+    country:        inputCountry.value.trim()    || null,
+    zip:            inputZip.value.trim()        || null,
+    desired_salary: inputSalary.value.trim()     || null,
+    race:           inputRace.value.trim()       || null,
+    veteran:        inputVeteran.value.trim()    || null,
+    disability:     inputDisability.value.trim() || null,
+  };
+  
+  console.log("[Popup] Saving profile:", profileData);
+  
   try {
     const [userData] = await Promise.all([
       apiFetch("/save-user", {
@@ -407,23 +397,12 @@ btnSaveUser.addEventListener("click", async () => {
       }),
       apiFetch("/profile", {
         method: "POST",
-        body: JSON.stringify({
-          first_name:     inputFirstName.value.trim()  || null,
-          last_name:      inputLastName.value.trim()   || null,
-          email:          inputEmail.value.trim()      || null,
-          phone:          inputPhone.value.trim()      || null,
-          street:         inputStreet.value.trim()     || null,
-          city:           inputCity.value.trim()       || null,
-          state:          inputState.value.trim()      || null,
-          country:        inputCountry.value.trim()    || null,
-          zip:            inputZip.value.trim()        || null,
-          desired_salary: inputSalary.value.trim()     || null,
-          race:           inputRace.value.trim()       || null,
-          veteran:        inputVeteran.value.trim()    || null,
-          disability:     inputDisability.value.trim() || null,
-        }),
+        body: JSON.stringify(profileData),
       }),
     ]);
+    
+    console.log("[Popup] Profile saved successfully");
+    
     currentUsername = userData.name;
     setHeaderUser(userData.name);
     welcomeUserName.textContent = userData.name;
@@ -443,7 +422,11 @@ document.getElementById("btn-edit-profile").addEventListener("click", async () =
   setupTitle.textContent    = "Edit Profile";
   setupSubtitle.textContent = "Update your name or resume below.";
   try {
+    console.log("[Popup] Loading profile for edit...");
     const [user, profile] = await Promise.all([apiFetch("/user/full"), apiFetch("/profile")]);
+    console.log("[Popup] User data:", user);
+    console.log("[Popup] Profile data:", profile);
+    
     inputName.value         = user.name || "";
     inputResume.value       = user.base_resume_text || "";
     inputFirstName.value    = profile.first_name    || "";
@@ -459,7 +442,8 @@ document.getElementById("btn-edit-profile").addEventListener("click", async () =
     inputRace.value         = profile.race          || "";
     inputVeteran.value      = profile.veteran       || "";
     inputDisability.value   = profile.disability    || "";
-  } catch {
+  } catch (err) {
+    console.error("[Popup] Error loading profile:", err);
     inputName.value = "";
     inputResume.value = "";
   }

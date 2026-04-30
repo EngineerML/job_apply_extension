@@ -35,18 +35,28 @@ function scrapeJobData() {
   ]);
 
   let description = get([
+    // LinkedIn
     "#job-details",
     ".jobs-description__content .jobs-box__html-content",
     ".jobs-description-content__text",
+    // Indeed
     "#jobDescriptionText",
     ".jobsearch-jobDescriptionText",
     "[data-testid='jobsearch-jobDescriptionText']",
     "[data-test='description']",
     ".jobDescriptionContent",
+    // ZipRecruiter
+    ".job_description",
+    ".job-description",
+    "[data-testid='job-description']",
+    ".ZipJobDescription",
+    ".job_content",
+    ".job-content",
     "[class*='job-description']",
     "[class*='jobDescription']",
     "[id*='job-description']",
     "[id*='jobDescription']",
+    "[class*='job_description']",
     "article",
     "[role='main']",
   ]);
@@ -56,7 +66,8 @@ function scrapeJobData() {
     let best = { el: null, len: 0 };
     candidates.forEach((el) => {
       const len = el.innerText?.trim().length || 0;
-      if (len > best.len && len < 20000) best = { el, len };
+      // Accept content between 500-50000 chars to avoid nav/footer but capture full descriptions
+      if (len > 500 && len < 50000 && len > best.len) best = { el, len };
     });
     if (best.el) description = best.el.innerText.trim();
   }
@@ -64,7 +75,7 @@ function scrapeJobData() {
   return {
     title,
     company,
-    description: (description || "").slice(0, 4000),
+    description: description || "",
     url: window.location.href,
   };
 }
