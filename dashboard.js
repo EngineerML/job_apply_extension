@@ -15,6 +15,9 @@ const tabDesc       = document.getElementById("tab-description");
 const tabCL         = document.getElementById("tab-cover-letter");
 const tabSQ         = document.getElementById("tab-special-qa");
 
+const searchWrap    = document.getElementById("search-wrap");
+const searchInput   = document.getElementById("search-input");
+
 let currentJobId = null;
 
 // Helpers
@@ -71,15 +74,28 @@ async function loadJobs() {
     // Store jobs for modal lookup
     window._jobs = jobs;
     tableWrap.style.display = "block";
+    searchWrap.style.display = "block";
 
     // Attach view and delete button listeners
-    tbody.querySelectorAll(".btn-view").forEach((btn) => {
-      btn.addEventListener("click", () => openModal(btn.dataset.id));
-    });
+    function attachListeners() {
+      tbody.querySelectorAll(".btn-view").forEach((btn) => {
+        btn.addEventListener("click", () => openModal(btn.dataset.id));
+      });
+      tbody.querySelectorAll(".btn-delete").forEach((btn) => {
+        btn.addEventListener("click", () => deleteJob(btn.dataset.id));
+      });
+    }
+    attachListeners();
 
-    tbody.querySelectorAll(".btn-delete").forEach((btn) => {
-      btn.addEventListener("click", () => deleteJob(btn.dataset.id));
-    });
+    // Search
+    searchInput.value = "";
+    searchInput.oninput = () => {
+      const q = searchInput.value.toLowerCase();
+      tbody.querySelectorAll("tr").forEach((tr) => {
+        const text = tr.textContent.toLowerCase();
+        tr.style.display = text.includes(q) ? "" : "none";
+      });
+    };
 
   } catch (err) {
     loadingEl.textContent = `Error: ${err.message}`;

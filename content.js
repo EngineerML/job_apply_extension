@@ -61,6 +61,19 @@ function scrapeJobData() {
     if (best.el) description = best.el.innerText.trim();
   }
 
+  // ── Site-specific fixes ───────────────────────────
+  const host = window.location.hostname;
+
+  if (host.includes("remotive.com")) {
+    // Title format: "[Hiring] Job Title @ Company Name"
+    const atIdx = title.lastIndexOf(" @ ");
+    if (atIdx !== -1) {
+      company = title.slice(atIdx + 3).trim();
+      title   = title.slice(0, atIdx).trim();
+    }
+    title = title.replace(/^\[Hiring\]\s*/i, "").trim();
+  }
+
   return {
     title: title || "",
     company: company || "",

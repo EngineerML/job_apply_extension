@@ -38,6 +38,28 @@ header {
 .header-text h1 { font-size: 15px; font-weight: 700; }
 .header-text span { font-size: 11px; color: #6b6b80; }
 
+/* Search */
+#search-wrap {
+  max-width: 960px;
+  margin: 24px auto 0;
+  padding: 0 24px;
+}
+
+#search-input {
+  width: 100%;
+  padding: 10px 16px;
+  background: #1e1e2a;
+  border: 1px solid #2a2a38;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #f1f1f3;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#search-input::placeholder { color: #44445a; }
+#search-input:focus { border-color: #6366f1; }
+
 /* Main */
 main {
   max-width: 960px;
