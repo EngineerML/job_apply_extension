@@ -13,6 +13,7 @@ const modalStatus   = document.getElementById("modal-status-select");
 const modalStatusMsg = document.getElementById("modal-status-msg");
 const tabDesc       = document.getElementById("tab-description");
 const tabCL         = document.getElementById("tab-cover-letter");
+const tabSQ         = document.getElementById("tab-special-qa");
 
 let currentJobId = null;
 
@@ -53,9 +54,10 @@ async function loadJobs() {
     }
 
     tbody.innerHTML = "";
-    jobs.forEach((job) => {
+    jobs.forEach((job, idx) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
+        <td class="num-cell">${jobs.length - idx}</td>
         <td class="date-cell">${formatDate(job.created_at)}</td>
         <td class="title-cell" title="${job.title || ""}">${job.title || "—"}</td>
         <td class="company-cell" title="${job.company || ""}">${job.company || "—"}</td>
@@ -124,6 +126,23 @@ function openModal(jobId) {
   tabCL.className   = `tab-panel${job.cover_letter ? "" : " empty"}`;
   if (!job.cover_letter) tabCL.textContent = "No cover letter saved for this job.";
 
+  // Special Q&A
+  tabSQ.innerHTML = "";
+  const qa = job.special_qa || [];
+  if (!qa.length) {
+    tabSQ.innerHTML = `<div class="tab-panel empty">No special Q&amp;A saved for this job.</div>`;
+  } else {
+    qa.forEach((item, i) => {
+      const div = document.createElement("div");
+      div.className = "qa-item";
+      div.innerHTML = `
+        <div class="qa-q">Q${i + 1}: ${item.prompt}</div>
+        <div class="qa-a">${item.answer}</div>
+      `;
+      tabSQ.appendChild(div);
+    });
+  }
+
   // Reset to description tab
   switchTab("description");
 
@@ -136,6 +155,7 @@ function switchTab(name) {
   document.querySelector(`[data-tab="${name}"]`).classList.add("active");
   tabDesc.style.display = name === "description" ? "block" : "none";
   tabCL.style.display   = name === "cover-letter" ? "block" : "none";
+  tabSQ.style.display   = name === "special-qa"   ? "block" : "none";
 }
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {

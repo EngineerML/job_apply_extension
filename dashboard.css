@@ -263,3 +263,34 @@ select:focus { outline: 2px solid #6366f1; border-color: transparent; }
 }
 
 .tab-panel.empty { color: #44445a; font-style: italic; }
+
+/* ── Special Q&A in dashboard modal ─────────────────── */
+.qa-item {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a2a38;
+}
+.qa-item:last-child { border-bottom: none; margin-bottom: 0; }
+
+.qa-q {
+  font-size: 12px;
+  font-weight: 600;
+  color: #818cf8;
+  margin-bottom: 6px;
+}
+
+.qa-a {
+  font-size: 13px;
+  color: #a0a0b8;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* ── Row number cell ─────────────────────────────────── */
+td.num-cell {
+  color: #44445a;
+  font-size: 11px;
+  font-weight: 600;
+  width: 32px;
+  text-align: center;
+}

@@ -9,7 +9,7 @@ function scrapeJobData() {
     return "";
   };
 
-  const title = get([
+  let title = get([
     ".job-details-jobs-unified-top-card__job-title h1",
     ".jobs-unified-top-card__job-title h1",
     ".t-24.t-bold",
@@ -22,7 +22,7 @@ function scrapeJobData() {
     "h1",
   ]);
 
-  const company = get([
+  let company = get([
     ".job-details-jobs-unified-top-card__company-name a",
     ".job-details-jobs-unified-top-card__company-name",
     ".jobs-unified-top-card__company-name a",
@@ -35,28 +35,18 @@ function scrapeJobData() {
   ]);
 
   let description = get([
-    // LinkedIn
     "#job-details",
     ".jobs-description__content .jobs-box__html-content",
     ".jobs-description-content__text",
-    // Indeed
     "#jobDescriptionText",
     ".jobsearch-jobDescriptionText",
     "[data-testid='jobsearch-jobDescriptionText']",
     "[data-test='description']",
     ".jobDescriptionContent",
-    // ZipRecruiter
-    ".job_description",
-    ".job-description",
-    "[data-testid='job-description']",
-    ".ZipJobDescription",
-    ".job_content",
-    ".job-content",
     "[class*='job-description']",
     "[class*='jobDescription']",
     "[id*='job-description']",
     "[id*='jobDescription']",
-    "[class*='job_description']",
     "article",
     "[role='main']",
   ]);
@@ -66,16 +56,15 @@ function scrapeJobData() {
     let best = { el: null, len: 0 };
     candidates.forEach((el) => {
       const len = el.innerText?.trim().length || 0;
-      // Accept content between 500-50000 chars to avoid nav/footer but capture full descriptions
-      if (len > 500 && len < 50000 && len > best.len) best = { el, len };
+      if (len > best.len && len < 20000) best = { el, len };
     });
     if (best.el) description = best.el.innerText.trim();
   }
 
   return {
-    title,
-    company,
-    description: description || "",
+    title: title || "",
+    company: company || "",
+    description: (description || "").slice(0, 4000),
     url: window.location.href,
   };
 }
@@ -95,7 +84,11 @@ function notifyIfChanged() {
   const data = scrapeJobData();
   // Only notify if something meaningful actually changed
   if (data.title || data.description) {
-    chrome.runtime.sendMessage({ type: "JOB_UPDATED", data });
+    try {
+      chrome.runtime.sendMessage({ type: "JOB_UPDATED", data });
+    } catch (err) {
+      console.log("[Scraper] Could not send message (extension context may be invalidated)");
+    }
   }
 }
 

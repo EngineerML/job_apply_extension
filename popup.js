@@ -7,6 +7,7 @@ const views = {
   scan:        document.getElementById("view-scan"),
   pinned:      document.getElementById("view-pinned"),
   coverLetter: document.getElementById("view-cover-letter"),
+  specialQ:    document.getElementById("view-special-q"),
 };
 
 const headerUser     = document.getElementById("header-user");
@@ -25,21 +26,6 @@ const btnSetupBack  = document.getElementById("btn-setup-back");
 const setupTitle    = document.getElementById("setup-title");
 const setupSubtitle = document.getElementById("setup-subtitle");
 const statusSetup   = document.getElementById("status-setup");
-
-// Profile fields
-const inputFirstName  = document.getElementById("input-first-name");
-const inputLastName   = document.getElementById("input-last-name");
-const inputEmail      = document.getElementById("input-email");
-const inputPhone      = document.getElementById("input-phone");
-const inputStreet     = document.getElementById("input-street");
-const inputCity       = document.getElementById("input-city");
-const inputState      = document.getElementById("input-state");
-const inputCountry    = document.getElementById("input-country");
-const inputZip        = document.getElementById("input-zip");
-const inputSalary     = document.getElementById("input-salary");
-const inputRace       = document.getElementById("input-race");
-const inputVeteran    = document.getElementById("input-veteran");
-const inputDisability = document.getElementById("input-disability");
 
 // Scan
 const scanTitle      = document.getElementById("scan-title");
@@ -72,15 +58,16 @@ const modalDesc     = document.getElementById("modal-desc");
 const modalDescText = document.getElementById("modal-desc-text");
 
 // ── State ─────────────────────────────────────────────
-let scannedJob    = null;   // job detected on current page (scan view)
-let pinnedJob     = null;   // locked-in job (pinned view)
-let coverLetter   = "";     // current cover letter text
+let scannedJob      = null;
+let pinnedJob       = null;
+let coverLetter     = "";
+let specialQList    = [];  // [{ prompt, answer }]
 let currentUsername = "";
 
 // ── Helpers ───────────────────────────────────────────
 function showView(name) {
-  Object.values(views).forEach((v) => v.classList.remove("active"));
-  views[name].classList.add("active");
+  Object.values(views).forEach((v) => v && v.classList.remove("active"));
+  if (views[name]) views[name].classList.add("active");
 }
 
 function setStatus(el, msg, type = "") {
@@ -131,9 +118,9 @@ function scrapeCurrentTab() {
             return;
           }
           scannedJob = data;
-          scanTitle.textContent   = data.title   || "Not found";
-          scanCompany.textContent = data.company || "Not found";
-          scanRowDesc.style.display = data.description ? "flex" : "none";
+          scanTitle.value   = data.title   || "";
+          scanCompany.value = data.company || "";
+          scanRowDesc.style.display = data.description ? "block" : "none";
           if (data.title || data.company) {
             btnPin.disabled = false;
             setStatus(statusScan, "Job detected — pin it to start.", "success");
@@ -146,12 +133,23 @@ function scrapeCurrentTab() {
   });
 }
 
+// Enable pin button when user types manually
+[scanTitle, scanCompany].forEach((el) => {
+  el.addEventListener("input", () => {
+    btnPin.disabled = !scanTitle.value.trim() && !scanCompany.value.trim();
+  });
+});
+
 // ── Pin ───────────────────────────────────────────────
 btnPin.addEventListener("click", () => {
-  if (!scannedJob) return;
+  // Allow pinning even if nothing was auto-detected (manual entry)
+  if (!scannedJob) scannedJob = { title: "", company: "", description: "", url: window?.location?.href || "" };
+  scannedJob.title   = scanTitle.value.trim()   || scannedJob.title;
+  scannedJob.company = scanCompany.value.trim() || scannedJob.company;
   pinnedJob = scannedJob;
   savePin(pinnedJob);
   coverLetter = "";
+  specialQList = [];
   loadPinnedView();
   showView("pinned");
 });
@@ -196,9 +194,17 @@ btnComplete.addEventListener("click", async () => {
       });
     }
 
+    if (specialQList.length) {
+      await apiFetch("/save-special-qa", {
+        method: "POST",
+        body: JSON.stringify({ job_id, items: specialQList }),
+      });
+    }
+
     clearPin();
-    pinnedJob   = null;
-    coverLetter = "";
+    pinnedJob    = null;
+    coverLetter  = "";
+    specialQList = [];
     setStatus(statusScan, "Application saved! Ready for next job.", "success");
     showView("scan");
     scrapeCurrentTab();
@@ -267,6 +273,96 @@ document.getElementById("btn-cl-back").addEventListener("click", () => {
   coverLetter = elTextarea.value.trim();
   refreshClPreview();
   showView("pinned");
+});
+
+// ── Special Questions view ────────────────────────────────
+function renderSQList() {
+  const sqList   = document.getElementById("sq-list");
+  const statusSQ = document.getElementById("status-sq");
+  if (!sqList) return;
+  sqList.innerHTML = "";
+  specialQList.forEach((item, i) => {
+    const block = document.createElement("div");
+    block.className = "sq-block";
+    block.innerHTML = `
+      <div class="sq-block-header">
+        <span class="sq-num">Q${i + 1}</span>
+        <button class="sq-remove" data-i="${i}">×</button>
+      </div>
+      <textarea class="sq-prompt" data-i="${i}" placeholder="e.g. Explain your recent experience in Java…">${item.prompt}</textarea>
+      <button class="btn-primary sq-generate" data-i="${i}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Generate Answer
+      </button>
+      <textarea class="sq-answer" data-i="${i}" placeholder="Answer will appear here…">${item.answer}</textarea>
+    `;
+    sqList.appendChild(block);
+  });
+
+  // Sync prompt edits
+  sqList.querySelectorAll(".sq-prompt").forEach((el) => {
+    el.addEventListener("input", () => {
+      specialQList[+el.dataset.i].prompt = el.value;
+    });
+  });
+
+  // Sync answer edits
+  sqList.querySelectorAll(".sq-answer").forEach((el) => {
+    el.addEventListener("input", () => {
+      specialQList[+el.dataset.i].answer = el.value;
+    });
+  });
+
+  // Remove
+  sqList.querySelectorAll(".sq-remove").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      specialQList.splice(+btn.dataset.i, 1);
+      renderSQList();
+    });
+  });
+
+  // Generate
+  sqList.querySelectorAll(".sq-generate").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const i = +btn.dataset.i;
+      const prompt = specialQList[i].prompt.trim();
+      if (!prompt) return setStatus(statusSQ, "Enter a question first.", "error");
+      btn.disabled = true;
+      setStatus(statusSQ, "Generating...");
+      try {
+        const data = await apiFetch("/generate-answer", {
+          method: "POST",
+          body: JSON.stringify({
+            job_title:       prompt,
+            company:         pinnedJob.company,
+            job_description: pinnedJob.description,
+          }),
+        });
+        specialQList[i].answer = data.answer;
+        renderSQList();
+        setStatus(document.getElementById("status-sq"), "Done!", "success");
+      } catch (err) {
+        setStatus(document.getElementById("status-sq"), err.message, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+document.getElementById("btn-go-special-q").addEventListener("click", () => {
+  const statusSQ = document.getElementById("status-sq");
+  if (statusSQ) setStatus(statusSQ, "");
+  if (specialQList.length === 0) specialQList.push({ prompt: "", answer: "" });
+  renderSQList();
+  showView("specialQ");
+});
+
+document.getElementById("btn-sq-back").addEventListener("click", () => showView("pinned"));
+
+document.getElementById("btn-sq-add").addEventListener("click", () => {
+  specialQList.push({ prompt: "", answer: "" });
+  renderSQList();
 });
 
 // ── Downloads ─────────────────────────────────────────
@@ -339,9 +435,9 @@ chrome.runtime.onMessage.addListener((message) => {
   if (scannedJob && scannedJob.url === data.url && scannedJob.title === data.title) return;
 
   scannedJob = data;
-  scanTitle.textContent   = data.title   || "Not found";
-  scanCompany.textContent = data.company || "Not found";
-  scanRowDesc.style.display = data.description ? "flex" : "none";
+  scanTitle.value   = data.title   || "";
+  scanCompany.value = data.company || "";
+  scanRowDesc.style.display = data.description ? "block" : "none";
   btnPin.disabled = !(data.title || data.company);
   setStatus(statusScan, data.title ? "Job detected — pin it to start." : "", data.title ? "success" : "");
 });
@@ -370,42 +466,14 @@ btnSaveUser.addEventListener("click", async () => {
 
   btnSaveUser.disabled = true;
   setStatus(statusSetup, "Saving...");
-  
-  const profileData = {
-    first_name:     inputFirstName.value.trim()  || null,
-    last_name:      inputLastName.value.trim()   || null,
-    email:          inputEmail.value.trim()      || null,
-    phone:          inputPhone.value.trim()      || null,
-    street:         inputStreet.value.trim()     || null,
-    city:           inputCity.value.trim()       || null,
-    state:          inputState.value.trim()      || null,
-    country:        inputCountry.value.trim()    || null,
-    zip:            inputZip.value.trim()        || null,
-    desired_salary: inputSalary.value.trim()     || null,
-    race:           inputRace.value.trim()       || null,
-    veteran:        inputVeteran.value.trim()    || null,
-    disability:     inputDisability.value.trim() || null,
-  };
-  
-  console.log("[Popup] Saving profile:", profileData);
-  
   try {
-    const [userData] = await Promise.all([
-      apiFetch("/save-user", {
-        method: "POST",
-        body: JSON.stringify({ name, base_resume_text: resume }),
-      }),
-      apiFetch("/profile", {
-        method: "POST",
-        body: JSON.stringify(profileData),
-      }),
-    ]);
-    
-    console.log("[Popup] Profile saved successfully");
-    
-    currentUsername = userData.name;
-    setHeaderUser(userData.name);
-    welcomeUserName.textContent = userData.name;
+    const data = await apiFetch("/save-user", {
+      method: "POST",
+      body: JSON.stringify({ name, base_resume_text: resume }),
+    });
+    currentUsername = data.name;
+    setHeaderUser(data.name);
+    welcomeUserName.textContent = data.name;
     showView("welcome");
   } catch (err) {
     setStatus(statusSetup, err.message, "error");
@@ -422,29 +490,11 @@ document.getElementById("btn-edit-profile").addEventListener("click", async () =
   setupTitle.textContent    = "Edit Profile";
   setupSubtitle.textContent = "Update your name or resume below.";
   try {
-    console.log("[Popup] Loading profile for edit...");
-    const [user, profile] = await Promise.all([apiFetch("/user/full"), apiFetch("/profile")]);
-    console.log("[Popup] User data:", user);
-    console.log("[Popup] Profile data:", profile);
-    
-    inputName.value         = user.name || "";
-    inputResume.value       = user.base_resume_text || "";
-    inputFirstName.value    = profile.first_name    || "";
-    inputLastName.value     = profile.last_name     || "";
-    inputEmail.value        = profile.email         || "";
-    inputPhone.value        = profile.phone         || "";
-    inputStreet.value       = profile.street        || "";
-    inputCity.value         = profile.city          || "";
-    inputState.value        = profile.state         || "";
-    inputCountry.value      = profile.country       || "";
-    inputZip.value          = profile.zip           || "";
-    inputSalary.value       = profile.desired_salary || "";
-    inputRace.value         = profile.race          || "";
-    inputVeteran.value      = profile.veteran       || "";
-    inputDisability.value   = profile.disability    || "";
-  } catch (err) {
-    console.error("[Popup] Error loading profile:", err);
-    inputName.value = "";
+    const data = await apiFetch("/user/full");
+    inputName.value   = data.name || "";
+    inputResume.value = data.base_resume_text || "";
+  } catch {
+    inputName.value   = "";
     inputResume.value = "";
   }
   setStatus(statusSetup, "");
