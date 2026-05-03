@@ -107,7 +107,7 @@
         <div id="scan-row-desc" style="display:none;">
           <button id="btn-scan-show-desc" class="btn-ghost" style="padding:5px 10px;font-size:11px;width:auto;">
             <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            Show Description
+            <span id="btn-scan-show-desc-label">View / Edit Description</span>
           </button>
         </div>
 
@@ -154,7 +154,7 @@
         <div id="pinned-row-desc" style="display:none;">
           <button id="btn-pinned-show-desc" class="btn-ghost" style="padding:5px 10px;font-size:11px;width:auto;">
             <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            Show Job Description
+            <span id="btn-pinned-show-desc-label">View / Edit Job Description</span>
           </button>
         </div>
 
@@ -249,14 +249,20 @@
       </div>
     </div>
 
-    <!-- ── Job description modal (shared) ── -->
+    <!-- ── Job description modal (shared, editable) ── -->
     <div id="modal-desc" class="modal-overlay" style="display:none;">
       <div class="modal-box">
         <div class="modal-header">
           <span class="modal-title">Job Description</span>
           <button id="btn-close-modal" class="modal-close">×</button>
         </div>
-        <div class="modal-body" id="modal-desc-text"></div>
+        <div class="modal-body">
+          <textarea id="modal-desc-text" placeholder="Paste or edit the job description here…"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-cancel-desc" class="btn-ghost" style="width:auto;padding:6px 14px;">Cancel</button>
+          <button id="btn-save-desc" class="btn-primary" style="width:auto;padding:6px 14px;">Save</button>
+        </div>
       </div>
     </div>
 
