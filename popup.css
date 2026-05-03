@@ -627,6 +627,38 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   white-space: pre-wrap;
   scrollbar-width: thin;
   scrollbar-color: #2a2a38 transparent;
+  flex: 1;
+  display: flex;
+}
+
+.modal-body textarea {
+  width: 100%;
+  min-height: 240px;
+  flex: 1;
+  background: #15151e;
+  border: 1px solid #2a2a38;
+  border-radius: 8px;
+  color: #f1f1f3;
+  padding: 10px 12px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.modal-body textarea:focus {
+  border-color: #5b6cff;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #2a2a38;
+  flex-shrink: 0;
 }
 
 /* ── Field row (for side-by-side fields) ────────────── */
